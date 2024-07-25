@@ -529,7 +529,7 @@ def TraitBuilder():
         if answer == "m":
             trait = ManualTraitBuilder()
             answer = "q"
-        elif answer = "n":
+        elif answer == "n":
             trait = NNTraitBuilder()
             answer = "q"
         elif answer !="q":
