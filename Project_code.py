@@ -1,3 +1,11 @@
+#Project done by
+#Bernardo Rocha
+#
+#for the Projects in Maths Modelling module in UCD
+
+
+
+
 #region Imports
 import chess
 import random
@@ -539,3 +547,5 @@ basic_bot = BotPlayer(basic_evaluation,AB_prunning_search,1)
 
 
 #endregion
+
+
