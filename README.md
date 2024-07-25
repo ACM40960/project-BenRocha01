@@ -6,11 +6,24 @@ Bernardo Rocha 23214074
 
 
 
+# How to generate a BotPlayer
+<ol>
+<li>Decide if you want a Manual or NN bot</li>
+<li>Get a list of Traits accordingly to your choice</li>
+<li><ul>
+<li>If you chose an NN bot choose a NN model as calc_funct</li>
+<li>If you chose a Manual bot choose a manual calc_funct</li>
+</ul></li>
+<li>Create an Evaluator using the list of Traits and the calc_funct</li>
+<li>Create a Searcher using a searching function and a parameter</li>
+<li>Create a BotPlayer using the Evaluator and the Searcher defined previously</li>
+<li>You are ready use it to play or training</li>
+</ol>
 
 
 
 
-# Structure
+# Structure of the code file
 
 <ol>
 <li>Imports</li>
@@ -22,15 +35,18 @@ Bernardo Rocha 23214074
 <li>Evaluation
     <ol>
     <li>Manual Evaluation<ol>
-        <li>ManualTraits</li>
         <li>Manual calc_funct</li>
     </ol></li>
     <li>NNEvaluation<ol>
-        <li>NNTraits</li>
         <li>NeuralNetworks</li>
     </ol></li>
 
 </ol></li>
+<li>Trait<ol>
+    <li>ManualTrait</li>
+    <li>NNTrait</li>
+</ol> </li>
+<li>Builders</li>
 <li>Misc functions</li>
 <li>Preset instances<ol>
     <li>Lists of options</li>

@@ -138,18 +138,18 @@ class HumanPlayer(Player):
         pass
     
 class BotPlayer(Player):
-    def __init__(self,Evaluation,search_funct,search_param):
+    def __init__(self,Evaluator,search_funct,search_param):
         super().__init__()
-        self.Evaluation = Evaluation
+        self.Evaluator = Evaluator
         self.search_funct = search_funct
         self.search_param = search_param
         
     def doMove(self,board):
-        move = self.search_funct(board,self.search_param,self.Evaluation)
+        move = self.search_funct(board,self.search_param,self.Evaluator)
         return move
     
     def fit(self,library):
-        self.Evaluation.fit(library)
+        self.Evaluator.fit(library)
     
 #endregion
 
@@ -159,8 +159,20 @@ class BotPlayer(Player):
 
 #region Search
 
+class Search:
+    def __init__(self,funct,param):
+        self.funct = funct
+        self.param = param
+        
+    
+    def search(self,board,Evaluator):
+        return self.funct(board,self.param,Evaluator)
 
-def minimax_search(board,n,eval): #simple minimax        
+
+
+
+
+def minimax(board,n,Evaluator): #simple minimax        
     poss_moves = list(board.legal_moves)
     fen = board.fen()
     if len(poss_moves)>0: #Has possible moves -> evals each Node/Leaf
@@ -171,7 +183,7 @@ def minimax_search(board,n,eval): #simple minimax
                 for move in poss_moves:
                     t_board = chess.Board(fen)
                     t_board.push(move)
-                    t_value = minimax_search(t_board,n-1,eval)[1]
+                    t_value = minimax(t_board,n-1,Evaluator)[1]
                     if t_value > value:
                         value = t_value
                         best_move = move
@@ -185,7 +197,7 @@ def minimax_search(board,n,eval): #simple minimax
                 for move in poss_moves:
                     t_board = chess.Board(fen)
                     t_board.push(move)
-                    t_value = minimax_search(t_board,n-1,eval)[1]
+                    t_value = minimax(t_board,n-1,Evaluator)[1]
                     if t_value < value:
                         value = t_value
                         best_move = move
@@ -200,7 +212,7 @@ def minimax_search(board,n,eval): #simple minimax
                 t_board = chess.Board(board.fen())
                 t_board.push(move)
                 list_boards += [t_board,]
-                values = eval.evaluate(list_boards)                       
+                values = Evaluator.evaluate(list_boards)                       
             if board.turn: #White
                 m = max(values)
                 moves = [i for i, j in enumerate(values) if j == m]
@@ -229,7 +241,7 @@ def minimax_search(board,n,eval): #simple minimax
     except:
         print("error type 2",fen)
         
-def AB_prunning_search(board,n,eval,alpha=-2,beta=2): #alpha-beta prunning        
+def AB_prunning(board,n,Evaluator,alpha=-2,beta=2): #alpha-beta prunning        
     poss_moves = list(board.legal_moves)
     evals = []
     if len(poss_moves)>0: #Has possible moves -> evals each Node/Leaf                                  
@@ -239,7 +251,7 @@ def AB_prunning_search(board,n,eval,alpha=-2,beta=2): #alpha-beta prunning
                 for move in poss_moves:
                     t_board = chess.Board(board.fen())
                     t_board.push(move)
-                    t_value = AB_prunning_search(t_board,n-1,eval,alpha,beta)[1]
+                    t_value = AB_prunning(t_board,n-1,Evaluator,alpha,beta)[1]
                     if t_value > value:
                         value = t_value
                         best_move = move
@@ -257,7 +269,7 @@ def AB_prunning_search(board,n,eval,alpha=-2,beta=2): #alpha-beta prunning
                 for move in poss_moves:
                     t_board = chess.Board(board.fen())
                     t_board.push(move)
-                    t_value = AB_prunning_search(t_board,n-1,eval,alpha,beta)[1]
+                    t_value = AB_prunning(t_board,n-1,Evaluator,alpha,beta)[1]
                     if t_value < value:
                         value = t_value
                         best_move = move
@@ -276,7 +288,7 @@ def AB_prunning_search(board,n,eval,alpha=-2,beta=2): #alpha-beta prunning
                 t_board = chess.Board(board.fen())
                 t_board.push(move)
                 list_boards += [t_board,]
-                values = eval.evaluate(list_boards)                       
+                values = Evaluator.evaluate(list_boards)                       
             if board.turn: #White
                 m = max(values)
                 moves = [i for i, j in enumerate(values) if j == m]
@@ -309,7 +321,7 @@ def AB_prunning_search(board,n,eval,alpha=-2,beta=2): #alpha-beta prunning
 
 #region Evaluation
 
-class Evaluation:
+class Evaluator:
     def __init__(self,traits,calc_funct):
         self.traits = traits
         self.calc_funct = calc_funct
@@ -324,7 +336,7 @@ class Evaluation:
     
 #region ManualEvaluation
 
-class ManualEvaluation(Evaluation):
+class ManualEvaluator(Evaluator):
     def evaluate(self, list_boards):
         values = []
         for board in list_boards:
@@ -336,52 +348,6 @@ class ManualEvaluation(Evaluation):
                 black += change[1]
             values += [self.calc_funct(white,black),]
         return values
-
-
-#region ManualTrait
-class ManualTrait:
-    def __init__(self,trait_funct,trait_param):
-        self.funct = trait_funct
-        self.param = trait_param
-        
-    def getValues(self,board):
-        return self.funct(board,self.param)
- 
-    
-def piece_value(board,set):
-    value_dict =[{chess.PAWN:1,chess.KNIGHT:3,chess.BISHOP:3,chess.ROOK:5,chess.QUEEN:9,chess.KING:100}, # Common knowledge
-                 {chess.PAWN:1,chess.KNIGHT:3,chess.BISHOP:3.5,chess.ROOK:5,chess.QUEEN:10,chess.KING:100}, # Turing
-                 ]
-    white =0
-    black =0
-    for square in range(64):
-        p = board.piece_at(square)
-        if p is not None:
-            if p.color:
-                white += value_dict[set][p.piece_type]
-            else:
-                black += value_dict[set][p.piece_type]
-    
-    return white,black
- 
-def pawn_advancement(board,weight): #linear function that takes pawn advancement and return it's value
-    #white advancement
-    squares = np.array(board.pieces(chess.PAWN,chess.WHITE))
-    white = weight * sum(squares//8-1)
-    
-    #black advancement
-    squares = np.array(board.pieces(chess.PAWN,chess.BLACK))
-    black = weight * sum((64-squares)//8-1)
-    
-    return white, black  
-  
-
-      
-
-
-#endregion
-
-
 
 
 
@@ -413,7 +379,7 @@ def calc_sqrt_dif(white,black):
 
 
 #region NNEvaluation
-class NNEvaluation(Evaluation):
+class NNEvaluator(Evaluator):
     def evaluate(self, board):
         bitboards = np.array()
         for trait in self.traits:
@@ -426,18 +392,7 @@ class NNEvaluation(Evaluation):
         pass #Not implemented yet
     
 
-#region NNTrait
-def position_bitboard(board): #pnbrqkPNBRQK #bW
-    
-    map = board.piece_map()
-    piece_list = ["P", "N", "B", "R", "Q", "K", "p", "n", "b", "r", "q", "k"]
-    bitboards = {piece: np.zeros((8,8)) for piece in piece_list}
-    
-    for square, piece in map.items():
-        bitboards[piece.symbol()][divmod(square,8)] = 1
-        
-    return  np.array([bitboards[piece] for piece in piece_list])
-#endregion
+
 
 
 
@@ -447,6 +402,189 @@ def position_bitboard(board): #pnbrqkPNBRQK #bW
 #endregion    
 
 #endregion
+
+#endregion
+
+
+
+
+
+#region Trait
+class Trait:
+    #Missing description method/attribute
+    def __init__(self,name,funct):
+        self.name = name
+        self.funct = funct
+    
+    def getValues(self,board):
+        raise NotImplementedError("This is meant ot be implemented by the subclasses")
+
+
+#region ManualTrait
+
+class ManualTrait(Trait):
+    def __init__(self,funct,param):
+        super().__init__(funct)
+        self.param = param
+        
+    def set_param(self,param):
+        self.param = param
+        
+    def getValues(self,board):
+        return self.funct(board,self.param)
+ 
+    
+def piece_value_funct(board,set):
+    value_dict =[{chess.PAWN:1,chess.KNIGHT:3,chess.BISHOP:3,chess.ROOK:5,chess.QUEEN:9,chess.KING:100}, # Common knowledge
+                 {chess.PAWN:1,chess.KNIGHT:3,chess.BISHOP:3.5,chess.ROOK:5,chess.QUEEN:10,chess.KING:100}, # Turing
+                 ]
+    white =0
+    black =0
+    for square in range(64):
+        p = board.piece_at(square)
+        if p is not None:
+            if p.color:
+                white += value_dict[set][p.piece_type]
+            else:
+                black += value_dict[set][p.piece_type]
+    
+    return white,black
+
+piece_value = ManualTrait("Piece value", piece_value_funct)
+
+
+def pawn_advancement_funct(board,weight): #linear function that takes pawn advancement and return it's value
+    #white advancement
+    squares = np.array(board.pieces(chess.PAWN,chess.WHITE))
+    white = weight * sum(squares//8-1)
+    
+    #black advancement
+    squares = np.array(board.pieces(chess.PAWN,chess.BLACK))
+    black = weight * sum((64-squares)//8-1)
+    
+    return white, black  
+ 
+pawn_advancement = ManualTrait("Pawn advancement",pawn_advancement_funct) 
+
+      
+
+
+#endregion
+
+
+
+
+
+#region NNTrait
+
+class NNTrait(Trait):
+    def getValues(self, board):
+        return self.funct(board)
+    
+
+
+
+def position_bitboard_funct(board): #pnbrqkPNBRQK #bW
+    
+    map = board.piece_map()
+    piece_list = ["P", "N", "B", "R", "Q", "K", "p", "n", "b", "r", "q", "k"]
+    bitboards = {piece: np.zeros((8,8)) for piece in piece_list}
+    
+    for square, piece in map.items():
+        bitboards[piece.symbol()][divmod(square,8)] = 1
+        
+    return  np.array([bitboards[piece] for piece in piece_list])
+
+position_bitboard = NNTrait("Positions bitboard",position_bitboard_funct)
+#endregion
+#endregion
+
+
+
+
+
+#region Lists
+search_functs = [minimax, AB_prunning]
+calc_functs = [calc_zero, calc_sum, calc_div, calc_sq_dif, calc_sqrt_dif]
+manual_traits = [piece_value, pawn_advancement]
+nn_traits = [position_bitboard]
+#endregion
+
+
+
+
+
+#region Builders
+
+
+        
+def TraitBuilder():
+    answer = None
+    while answer != "q":
+        print("""Trait Builder options:
+              -Manual Trait (m)
+              -NN Trait(n)
+              -quit(q)""")
+        answer = input("answer: ")
+        if answer == "m":
+            trait = ManualTraitBuilder()
+            answer = "q"
+        elif answer = "n":
+            trait = NNTraitBuilder()
+            answer = "q"
+        elif answer !="q":
+            print("invalid input")
+
+def ManualTraitBuilder():
+    answer = None
+    while answer != "q":
+        print("""Manual Trait Builder:
+              choose a function:""")
+        options = []
+        for n,i in manual_traits:
+            print("-"+i.name+"("+str(n)+")")
+            options += [n,]
+            
+        try:
+            trait_n = int(input("answer: "))
+            if trait_n in options:
+                trait = manual_traits[trait_n]
+                print("Set a parameter value:")
+                while answer != "q":
+                    try:
+                        param = int(input("answer"))
+                        trait.set_param(param)
+                        answer = "q"
+                    except ValueError:
+                        print("Invalid input. Please enter a number")
+            else:
+                print("Option out of bounds")
+        except ValueError:
+            print("Invalid input. Please enter a number")
+            
+    return trait
+
+def NNTraitBuilder():
+    answer = None
+    while answer != "q":
+        print("""Manual Trait Builder:
+              choose a function:""")
+        options = []
+        for n,i in manual_traits:
+            print("-"+i.name+"("+str(n)+")")
+            options += [n,]
+            
+        try:
+            trait_n = int(input("answer: "))
+            if trait_n in options:
+                trait = manual_traits[trait_n]
+                print("Set a parameter value:")
+                answer = "q"
+            else:
+                print("Option out of bounds")
+        except ValueError:
+            print("Invalid input. Please enter a number")
+    return trait
 
 #endregion
 
@@ -544,14 +682,6 @@ def load_library():
 
 
 
-#region Lists
-search_functs = [minimax_search, AB_prunning_search]
-calc_functs = [calc_zero, calc_sum, calc_div, calc_sq_dif, calc_sqrt_dif]
-manual_traits = [piece_value, pawn_advancement]
-nn_traits = [position_bitboard]
-#endregion
-
-
 
 
 
@@ -563,14 +693,14 @@ basic_trait = ManualTrait(piece_value,0)
 
 
 #region Evaluation
-basic_evaluation = ManualEvaluation([basic_trait],calc_sum)
+basic_evaluation = ManualEvaluator([basic_trait],calc_sum)
 #endregion
 
 
 
 
 #region Bots
-basic_bot = BotPlayer(basic_evaluation,AB_prunning_search,1)
+basic_bot = BotPlayer(basic_evaluation,AB_prunning,1)
 
 #endregion
 
