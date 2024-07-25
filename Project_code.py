@@ -33,7 +33,7 @@ Bots = []
 #region Main functions 
     
 def version():
-    print("V 0.2.5")
+    print("V 0.2.9")
     ###Changelog
     # V 0.1.0   -The whole evaluation system was revamped to be modular
     # V 0.2.0   -Code was reestructured. There are now classes and subclasses for most things.
@@ -377,9 +377,11 @@ def pawn_advancement(board,weight): #linear function that takes pawn advancement
   
 
       
-#endregion
+
 
 #endregion
+
+
 
 
 
@@ -404,6 +406,8 @@ def calc_sqrt_dif(white,black):
     return hyptan(white**(1/2)-black**(1/2),1)
 #endregion
 
+#endregion
+
 
 
 
@@ -411,10 +415,36 @@ def calc_sqrt_dif(white,black):
 #region NNEvaluation
 class NNEvaluation(Evaluation):
     def evaluate(self, board):
-        pass #Not implemented yet
+        bitboards = np.array()
+        for trait in self.traits:
+            np.append(trait(board))
+        results = self.calc_funct.predict(bitboards)
+        return results
+            
     
     def fit(self,library):
         pass #Not implemented yet
+    
+
+#region NNTrait
+def position_bitboard(board): #pnbrqkPNBRQK #bW
+    
+    map = board.piece_map()
+    piece_list = ["P", "N", "B", "R", "Q", "K", "p", "n", "b", "r", "q", "k"]
+    bitboards = {piece: np.zeros((8,8)) for piece in piece_list}
+    
+    for square, piece in map.items():
+        bitboards[piece.symbol()][divmod(square,8)] = 1
+        
+    return  np.array([bitboards[piece] for piece in piece_list])
+#endregion
+
+
+
+
+
+#region NeuralNetworks
+#endregion    
 
 #endregion
 
@@ -517,7 +547,8 @@ def load_library():
 #region Lists
 search_functs = [minimax_search, AB_prunning_search]
 calc_functs = [calc_zero, calc_sum, calc_div, calc_sq_dif, calc_sqrt_dif]
-trait_functs =[piece_value, pawn_advancement]
+manual_traits = [piece_value, pawn_advancement]
+nn_traits = [position_bitboard]
 #endregion
 
 
@@ -538,7 +569,7 @@ basic_evaluation = ManualEvaluation([basic_trait],calc_sum)
 
 
 
-#region Player
+#region Bots
 basic_bot = BotPlayer(basic_evaluation,AB_prunning_search,1)
 
 #endregion
