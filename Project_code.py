@@ -8,6 +8,7 @@
 
 #region Imports
 import chess
+import chess.pgn
 import random
 import math
 import time
@@ -33,7 +34,7 @@ Bots = []
 #region Main functions 
     
 def version():
-    print("V 0.2.9")
+    print("V 0.2.10")
     ###Changelog
     # V 0.1.0   -The whole evaluation system was revamped to be modular
     # V 0.2.0   -Code was reestructured. There are now classes and subclasses for most things.
@@ -422,11 +423,7 @@ class Trait:
 
 #region ManualTrait
 
-class ManualTrait(Trait):
-    def __init__(self,funct,param):
-        super().__init__(funct)
-        self.param = param
-        
+class ManualTrait(Trait):        
     def set_param(self,param):
         self.param = param
         
@@ -604,71 +601,34 @@ def gameover(board):
     else:
         return 0
     
-def load_library():
-    f = open("Game_library.pgn","r")
-    file = f.read()
-    lines = file.split("\n")
+def loadFromRepository():
+    pgn = open("Game_library.pgn")
+    game = 0
     games = []
-    state = 0
-    for line in lines:
-        if state == 0: #Intro
-            if len(line)==0: #goes from intro to game
-                state = 1
-                game = []
-            elif "960" in line: #goes from intro to 960
-                state = 2
-                substate = 1
-                
-        elif state == 1: #Game
-            if len(line)!=0: #save the line
-                game +=[line,]
-            else: #end of game back to intro
-                state = 0
-                games +=[game,]
+    while game is not None:
+        game = chess.pgn.read_game(pgn)
+        games += [[game.headers["Result"],game.end().board()],]
+    pgn.close()
+    return games
+   
+
+def gamesToLibrary(o_games,minply = 0):
+    games = copy.deepcopy(o_games)
+    library = []
+    for game in games:
         
-        elif state == 2: #960
-            if substate == 1:#intro of 960
-                if len(line) == 0: #end of intro
-                    substate = 0
-            elif substate == 0: #960 game
-                if len(line) == 0: #end of 960 game
-                    state = 0
-                
-    #for game in games:
-    #    print(game)   
-    
-    ngames = []    
-        
-    for n,game in enumerate(games):
-        ngame = []
-        for line in game:
-            for item in line.split(" "):
-                ngame +=[item,]
-        ngames += [ngame,]
-     
-    trainset = []
-    y = []
-    for ngame,game in enumerate(ngames):
-        t_y = game.pop()
-        board = chess.Board()
-        #print(game)
-        for n,item in enumerate(game):
-            if n%3 != 0:
-                #print(item)
-                move = board.parse_san(item)
-                board.push(move)
-                #print(board)
-                #print()
-                trainset += [chess.Board(board.fen()),]
-                if t_y == "1/2-1/2":
-                    y += [0,]
-                elif t_y == "1-0":
-                    y += [1,]
-                elif t_y == "0-1":
-                    y += [-1,]
-     
-    library = np.array([trainset,y])
-    return library    
+        if game[0]=="1-0" or game[0] == 1:
+            result = 1
+        elif game[0]=="1/2-1/2" or game[0] == 0:
+            result = 0
+        else:
+            result = -1
+        while game[1].ply() > minply:
+            
+            library += [[game[1],result],]
+            game[1].pop()
+    return library
+library = gamesToLibrary(games)
 
 #endregion
 
