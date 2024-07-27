@@ -4,7 +4,8 @@ The main code right now is Project_code. The rest are mostly remainders of previ
 
 Bernardo Rocha 23214074
 
-
+decided to only use sequential because going to higher complexity models would 
+lead down a rabbit hoe that doesn't fall into the perview of this module
 
 # How to generate a BotPlayer
 <ol>

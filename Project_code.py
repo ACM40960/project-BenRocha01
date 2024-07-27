@@ -10,6 +10,7 @@
 import chess
 import chess.pgn
 import random
+import copy
 import math
 import time
 import numpy as np
@@ -88,20 +89,28 @@ def simulateChessGame(p1,p2):
             try:
                 move = p1.doMove(board)
             except UnboundLocalError:
-                print(board.fen())
+                raise UnboundLocalError(board.fen())
             
         else:
             try:
                 move = p2.doMove(board)
             except UnboundLocalError:
-                print(board.fen())
+                raise UnboundLocalError(board.fen())
         board.push(move)
     
     result = gameover(board)
     return result,board 
 
-def trainBots(p1,p2,n,train_p1 = True, train_p2 = True):
-    pass #Not implemented yet
+def trainByPlaying(Player1,Player2,n,trainPlayer1 = True, trainPlayer2=True):
+    games = []
+    for i in range(n):
+        result,board = simulateChessGame(Player1,Player2)
+        games += [[result,board],] 
+    library = gamesToLibrary(games)
+    if trainPlayer1:
+        Player1.fit(library[0],library[1])
+    if trainPlayer2:
+        Player2.fit(library[0],library[1])
 
 def simulateMultipleGames(p1,p2,n):
     count = [0,0,0]
@@ -114,6 +123,7 @@ def simulateMultipleGames(p1,p2,n):
         elif result == -1:
             count[2] += 1
     print(count)
+
 
 #endregion
 
@@ -139,14 +149,13 @@ class HumanPlayer(Player):
         pass
     
 class BotPlayer(Player):
-    def __init__(self,Evaluator,search_funct,search_param):
+    def __init__(self,Evaluator,Searcher):
         super().__init__()
         self.Evaluator = Evaluator
-        self.search_funct = search_funct
-        self.search_param = search_param
+        self.Searcher = Searcher
         
     def doMove(self,board):
-        move = self.search_funct(board,self.search_param,self.Evaluator)
+        move = self.Searcher.search(board,self.Evaluator)
         return move
     
     def fit(self,library):
@@ -160,14 +169,14 @@ class BotPlayer(Player):
 
 #region Search
 
-class Search:
+class Searcher:
     def __init__(self,funct,param):
         self.funct = funct
         self.param = param
         
     
     def search(self,board,Evaluator):
-        return self.funct(board,self.param,Evaluator)
+        return self.funct(board,self.param,Evaluator)[0]
 
 
 
@@ -291,11 +300,11 @@ def AB_prunning(board,n,Evaluator,alpha=-2,beta=2): #alpha-beta prunning
                 list_boards += [t_board,]
                 values = Evaluator.evaluate(list_boards)                       
             if board.turn: #White
-                m = max(values)
-                moves = [i for i, j in enumerate(values) if j == m]
+                value = max(values)
+                moves = [i for i, j in enumerate(values) if j == value]
             else: #black
-                m = min(values)
-                moves = [i for i, j in enumerate(values) if j == m]         
+                value = min(values)
+                moves = [i for i, j in enumerate(values) if j == value]         
             best_move = poss_moves[random.choice(moves)        ]
     else:
         if board.is_game_over():
@@ -310,8 +319,87 @@ def AB_prunning(board,n,Evaluator,alpha=-2,beta=2): #alpha-beta prunning
                 best_move = "stalemate?"
         else:
             print(board.fen()) 
-    return best_move
+    return best_move,value
 
+def ID_AB_prunning(board,n,Evaluator,alpha=-2,beta=2): #alpha-beta prunning        
+    poss_moves = list(board.legal_moves)
+    if len(poss_moves)>0: #Has possible moves -> evals each Node/Leaf 
+        
+        list_boards = []
+        
+        for move in poss_moves:
+            t_board = chess.Board(board.fen())
+            t_board.push(move)
+            list_boards += [t_board,]
+            values = Evaluator.evaluate(list_boards)
+        
+        sorted_indices = sorted(range(len(values)),key=lambda k: values[k])
+        values = [values[i] for i in sorted_indices]
+        poss_moves = [poss_moves[i] for i in sorted_indices]
+        
+        
+                                         
+        if n>1: #Branch Nodes
+            if board.turn: #White
+                value = -5
+                for move in poss_moves:
+                    t_board = chess.Board(board.fen())
+                    t_board.push(move)
+                    t_value = AB_prunning(t_board,n-1,Evaluator,alpha,beta)[1]
+                    if t_value > value:
+                        value = t_value
+                        best_move = move
+                    elif t_value == value:
+                        r = random.random()
+                        if r > 0.1:
+                            value = t_value
+                            best_move = move
+                    if value > beta:
+                        break
+                    alpha = max(alpha,value)        
+                         
+            else: #Black
+                value = 5
+                for move in poss_moves:
+                    t_board = chess.Board(board.fen())
+                    t_board.push(move)
+                    t_value = AB_prunning(t_board,n-1,Evaluator,alpha,beta)[1]
+                    if t_value < value:
+                        value = t_value
+                        best_move = move
+                    elif t_value == value: #better move
+                        r = random.random()
+                        if r > 0.1:
+                            value = t_value
+                            best_move = move
+                    if value < alpha: #equally good move
+                        break
+                    beta = min(beta,value) 
+                    
+        elif n==1: #Leafs                        
+            if board.turn: #White
+                value = max(values)
+                moves = [i for i, j in enumerate(values) if j == value]
+            else: #black
+                value = min(values)
+                moves = [i for i, j in enumerate(values) if j == value]         
+            best_move = poss_moves[random.choice(moves)]
+        
+        
+    else:
+        if board.is_game_over():
+            if board.is_checkmate():
+                value = 2*(board.turn*(-2)+1)
+                best_move = "checkmate?"
+            elif board.is_insufficient_material():
+                value = 0
+                best_move = "insf material?"
+            elif board.is_stalemate():
+                value = 0
+                best_move = "stalemate?"
+        else:
+            print(board.fen()) 
+    return best_move,value
 
 
 #endregion
@@ -323,9 +411,9 @@ def AB_prunning(board,n,Evaluator,alpha=-2,beta=2): #alpha-beta prunning
 #region Evaluation
 
 class Evaluator:
-    def __init__(self,traits,calc_funct):
+    def __init__(self,traits,model):
         self.traits = traits
-        self.calc_funct = calc_funct
+        self.model = model
         
     def evaluate(self,board):
         raise NotImplementedError("Subclasses implement this method")
@@ -347,7 +435,7 @@ class ManualEvaluator(Evaluator):
                 change = trait.getValues(board)
                 white += change[0]
                 black += change[1]
-            values += [self.calc_funct(white,black),]
+            values += [self.model(white,black),]
         return values
 
 
@@ -394,6 +482,23 @@ class NNEvaluator(Evaluator):
     
 
 
+
+#region Model handling
+class Model(tf.keras.models.Sequential):
+    def setName(self,name):
+        self.costum_name = name
+        
+    def getName(self):
+        return self.costum_name
+    
+    def save(self):
+        if hasattr(self, 'name'):
+            super().save("model/"+self.costum_name + ".keras")
+        else:
+            raise ValueError("Model name has not been set. Use setName() method to set the model name.")
+
+
+#endregion
 
 
 
@@ -511,7 +616,7 @@ nn_traits = [position_bitboard]
 
 
 
-#region Builders
+#region Builders not actual builders
 
 
         
@@ -601,13 +706,14 @@ def gameover(board):
     else:
         return 0
     
-def loadFromRepository():
-    pgn = open("Game_library.pgn")
+def loadFromRepository(): #with gamesToLibrary takes close to 
+    pgn = open("libraries/Game_library.pgn")
     game = 0
     games = []
+    game = chess.pgn.read_game(pgn)
     while game is not None:
-        game = chess.pgn.read_game(pgn)
         games += [[game.headers["Result"],game.end().board()],]
+        game = chess.pgn.read_game(pgn)
     pgn.close()
     return games
    
@@ -616,7 +722,6 @@ def gamesToLibrary(o_games,minply = 0):
     games = copy.deepcopy(o_games)
     library = []
     for game in games:
-        
         if game[0]=="1-0" or game[0] == 1:
             result = 1
         elif game[0]=="1/2-1/2" or game[0] == 0:
@@ -625,10 +730,11 @@ def gamesToLibrary(o_games,minply = 0):
             result = -1
         while game[1].ply() > minply:
             
-            library += [[game[1],result],]
+            library += [[chess.Board(game[1].fen()),result],]
             game[1].pop()
+            
+    library = np.array(library).T
     return library
-library = gamesToLibrary(games)
 
 #endregion
 
@@ -646,8 +752,18 @@ library = gamesToLibrary(games)
 
 
 #region Traits
-basic_trait = ManualTrait(piece_value,0)
+basic_trait = piece_value
+basic_trait.set_param(0)
 #endregion
+
+
+
+
+
+#region Searcher
+ab_searcher_2 = Searcher(AB_prunning,2)
+#endregion
+
 
 
 
@@ -660,7 +776,7 @@ basic_evaluation = ManualEvaluator([basic_trait],calc_sum)
 
 
 #region Bots
-basic_bot = BotPlayer(basic_evaluation,AB_prunning,1)
+basic_bot = BotPlayer(basic_evaluation,ab_searcher_2)
 
 #endregion
 
