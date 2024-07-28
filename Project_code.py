@@ -182,60 +182,52 @@ class Searcher:
 
 
 
-def minimax(board,n,Evaluator): #simple minimax        
+def nn_minimax(board,n,Evaluator,slave=False,alpha=-2,beta=2): #alpha-beta prunning        
     poss_moves = list(board.legal_moves)
-    fen = board.fen()
-    if len(poss_moves)>0: #Has possible moves -> evals each Node/Leaf
-            
-        if n>1: #Branches
-            if board.turn:
-                value = -200
-                for move in poss_moves:
-                    t_board = chess.Board(fen)
-                    t_board.push(move)
-                    t_value = minimax(t_board,n-1,Evaluator)[1]
-                    if t_value > value:
-                        value = t_value
-                        best_move = move
-                    elif t_value == value:
-                        r = random.random()
-                        if r > 0.1:
-                            value = t_value
-                            best_move = move
+    if len(poss_moves)>0: #Has possible moves -> evals each Node/Leaf                                  
+        if n>1: #Branch Nodes
+            value = -5
+            match_moves = [] 
+            for move in poss_moves:
+                t_board = chess.Board(board.fen())
+                t_board.push(move)
+                list_boards = nn_minimax(t_board,n-1,Evaluator,False,alpha,beta)[1]
+                if not slave:
+                    match_moves += [move,]*len(list_boards)
+            if slave:
+                best_move=0
             else:
-                value = 200
-                for move in poss_moves:
-                    t_board = chess.Board(fen)
-                    t_board.push(move)
-                    t_value = minimax(t_board,n-1,Evaluator)[1]
-                    if t_value < value:
-                        value = t_value
-                        best_move = move
-                    elif t_value == value:
-                        r = random.random()
-                        if r > 0.1:
-                            value = t_value
-                            best_move = move                              
-        else: #Leafs
+                values = Evaluator.evaluate(list_boards)
+                if board.turn: #White
+                    value = np.max(values)
+                    moves = np.where(values == value)[0]
+                else: #black
+                    value = np.min(values)
+                    moves = np.where(values == value)[0]
+                best_move = match_moves[random.choice(moves)]
+        
+        elif n==1: #Leafs  
             list_boards = []
             for move in poss_moves:
                 t_board = chess.Board(board.fen())
                 t_board.push(move)
                 list_boards += [t_board,]
-                values = Evaluator.evaluate(list_boards)                       
-            if board.turn: #White
-                m = max(values)
-                moves = [i for i, j in enumerate(values) if j == m]
-            else: #black
-                m = min(values)
-                moves = [i for i, j in enumerate(values) if j == m]         
-            best_move = poss_moves[random.choice(moves)]
             
-        
+            if slave:
+                best_move = 0
+            else:
+                values = Evaluator.evaluate(list_boards)                       
+                if board.turn: #White
+                    value = np.max(values)
+                    moves = np.where(values == value)[0]
+                else: #black
+                    value = np.min(values)
+                    moves = np.where(values == value)[0]
+                best_move = poss_moves[random.choice(moves)]
     else:
         if board.is_game_over():
             if board.is_checkmate():
-                value = 1*(board.turn*(-2)+1)
+                value = 2*(board.turn*(-2)+1)
                 best_move = "checkmate?"
             elif board.is_insufficient_material():
                 value = 0
@@ -244,12 +236,8 @@ def minimax(board,n,Evaluator): #simple minimax
                 value = 0
                 best_move = "stalemate?"
         else:
-            print("error type 1",fen)
-            
-    try:
-        return best_move,value
-    except:
-        print("error type 2",fen)
+            print(board.fen()) 
+    return best_move,list_boards
         
 def AB_prunning(board,n,Evaluator,alpha=-2,beta=2): #alpha-beta prunning        
     poss_moves = list(board.legal_moves)
@@ -298,14 +286,16 @@ def AB_prunning(board,n,Evaluator,alpha=-2,beta=2): #alpha-beta prunning
                 t_board = chess.Board(board.fen())
                 t_board.push(move)
                 list_boards += [t_board,]
-                values = Evaluator.evaluate(list_boards)                       
+            values = Evaluator.evaluate(list_boards)                       
             if board.turn: #White
-                value = max(values)
-                moves = [i for i, j in enumerate(values) if j == value]
+                value = np.max(values)
+                moves = np.where(values == value)[0]
             else: #black
-                value = min(values)
-                moves = [i for i, j in enumerate(values) if j == value]         
-            best_move = poss_moves[random.choice(moves)        ]
+                value = np.min(values)
+                moves = np.where(values == value)[0]
+                
+            #print(moves)
+            best_move = poss_moves[random.choice(moves)]
     else:
         if board.is_game_over():
             if board.is_checkmate():
@@ -469,11 +459,15 @@ def calc_sqrt_dif(white,black):
 
 #region NNEvaluation
 class NNEvaluator(Evaluator):
-    def evaluate(self, board):
-        bitboards = np.array()
-        for trait in self.traits:
-            np.append(trait(board))
-        results = self.calc_funct.predict(bitboards)
+    def evaluate(self, list_boards):
+        values = []
+        for board in list_boards:
+            bitboards = np.zeros((1,8,8))
+            for n,trait in enumerate(self.traits):
+                bitboards = np.append(bitboards,trait.getValues(board),axis=0)
+            values += [bitboards,]
+        values = np.array(values)       
+        results = self.model.predict(values,verbose = 0)
         return results
             
     
@@ -769,7 +763,22 @@ ab_searcher_2 = Searcher(AB_prunning,2)
 
 
 #region Evaluation
+
+first_model = Model([
+    tf.keras.layers.Flatten(input_shape=(13,8,8),name="flatten"),
+    tf.keras.layers.Dense(100,activation="relu",name="layer2"),
+    tf.keras.layers.Dense(1,activation="tanh",name="output")
+])
+
+first_model.setName("first_model")
+
+first_model.compile(optimizer='adam',
+              loss="mean_squared_error",
+              metrics=['accuracy'])
+
+
 basic_evaluation = ManualEvaluator([basic_trait],calc_sum)
+nn_eval = NNEvaluator([position_bitboard],first_model)
 #endregion
 
 
