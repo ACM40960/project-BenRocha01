@@ -149,8 +149,8 @@ class HumanPlayer(Player):
         pass
     
 class BotPlayer(Player):
-    def __init__(self,Evaluator,Searcher):
-        super().__init__()
+    def __init__(self,name,Evaluator,Searcher):
+        self.name = name
         self.Evaluator = Evaluator
         self.Searcher = Searcher
         
@@ -160,6 +160,8 @@ class BotPlayer(Player):
     
     def fit(self,library):
         self.Evaluator.fit(library)
+        
+ 
     
 #endregion
 
@@ -170,30 +172,61 @@ class BotPlayer(Player):
 #region Search
 
 class Searcher:
-    def __init__(self,funct,param):
+    def __init__(self,name,descr,funct,depth,param):
+        self.name = name
+        self.descr = descr
         self.funct = funct
+        self.depth = depth
         self.param = param
         
     
     def search(self,board,Evaluator):
-        return self.funct(board,self.param,Evaluator)[0]
+        return self.funct(board,self.depth,self.param,Evaluator)[0]
+
+
+class SearcherDirector:
+    @staticmethod
+    def minimax(depth):
+        descr = None
+        return Searcher("Minimax, depth "+str(depth),descr,minimax,depth,None)
+    
+    @staticmethod
+    def AB_prunning(depth):
+        descr = None
+        return Searcher("Alpha-Beta prunning, depth "+str(depth),descr,AB_prunning,depth,None)
+    
+    @staticmethod
+    def ID_AB_prunning(depth):
+        descr = None
+        return Searcher("Iterative deepening Alpha-Beta prunning, depth "+str(depth),descr,ID_AB_prunning,depth,None)
+    
+    @staticmethod
+    def MCTS(depth,param):
+        descr = None
+        return Searcher("Monte Carlo Tree Search, depth "+str(depth)+"  factor "+str(param),descr,basic_MCTS,depth,param)
+    
+    @staticmethod
+    def weighted_MCTS(depth,param):
+        descr = None
+        return Searcher("Weighted Monte Carlo Tree Search, depth "+str(depth)+"  factor "+str(param),descr,weighted_MCTS,depth,param)
 
 
 
 
-
-def nn_minimax(board,n,Evaluator,slave=False,alpha=-2,beta=2): #alpha-beta prunning        
+def minimax(board,depth,param,Evaluator,slave=False): #alpha-beta prunning
+    if type(depth)!=int:
+        raise TypeError("minimax parameter needs to be integer")
+            
     poss_moves = list(board.legal_moves)
     if len(poss_moves)>0: #Has possible moves -> evals each Node/Leaf                                  
-        if n>1: #Branch Nodes
-            value = -5
-            match_moves = [] 
+        if depth>1: #Branch Nodes
+            move_board_list = [] #matches the moves to a board
             for move in poss_moves:
                 t_board = chess.Board(board.fen())
                 t_board.push(move)
-                list_boards = nn_minimax(t_board,n-1,Evaluator,False,alpha,beta)[1]
+                list_boards = minimax(t_board,depth-1,Evaluator,True)[1]
                 if not slave:
-                    match_moves += [move,]*len(list_boards)
+                    move_board_list += [move,]*len(list_boards)
             if slave:
                 best_move=0
             else:
@@ -204,9 +237,9 @@ def nn_minimax(board,n,Evaluator,slave=False,alpha=-2,beta=2): #alpha-beta prunn
                 else: #black
                     value = np.min(values)
                     moves = np.where(values == value)[0]
-                best_move = match_moves[random.choice(moves)]
+                best_move = move_board_list[random.choice(moves)]
         
-        elif n==1: #Leafs  
+        elif depth==1: #Leafs  
             list_boards = []
             for move in poss_moves:
                 t_board = chess.Board(board.fen())
@@ -224,32 +257,24 @@ def nn_minimax(board,n,Evaluator,slave=False,alpha=-2,beta=2): #alpha-beta prunn
                     value = np.min(values)
                     moves = np.where(values == value)[0]
                 best_move = poss_moves[random.choice(moves)]
-    else:
-        if board.is_game_over():
-            if board.is_checkmate():
-                value = 2*(board.turn*(-2)+1)
-                best_move = "checkmate?"
-            elif board.is_insufficient_material():
-                value = 0
-                best_move = "insf material?"
-            elif board.is_stalemate():
-                value = 0
-                best_move = "stalemate?"
-        else:
-            print(board.fen()) 
     return best_move,list_boards
         
-def AB_prunning(board,n,Evaluator,alpha=-2,beta=2): #alpha-beta prunning        
+def AB_prunning(board,depth,param,Evaluator,alpha=-2,beta=2): #alpha-beta prunning   
+    
+    if type(depth)!=int:
+        raise TypeError("AB_prunning parameter needs to be integer")
+         
     poss_moves = list(board.legal_moves)
     evals = []
+    
     if len(poss_moves)>0: #Has possible moves -> evals each Node/Leaf                                  
-        if n>1: #Branch Nodes
+        if depth>1: #Branch Nodes
             if board.turn: #White
                 value = -5
                 for move in poss_moves:
                     t_board = chess.Board(board.fen())
                     t_board.push(move)
-                    t_value = AB_prunning(t_board,n-1,Evaluator,alpha,beta)[1]
+                    t_value = AB_prunning(t_board,depth-1,Evaluator,alpha,beta)[1]
                     if t_value > value:
                         value = t_value
                         best_move = move
@@ -267,7 +292,7 @@ def AB_prunning(board,n,Evaluator,alpha=-2,beta=2): #alpha-beta prunning
                 for move in poss_moves:
                     t_board = chess.Board(board.fen())
                     t_board.push(move)
-                    t_value = AB_prunning(t_board,n-1,Evaluator,alpha,beta)[1]
+                    t_value = AB_prunning(t_board,depth-1,Evaluator,alpha,beta)[1]
                     if t_value < value:
                         value = t_value
                         best_move = move
@@ -280,7 +305,7 @@ def AB_prunning(board,n,Evaluator,alpha=-2,beta=2): #alpha-beta prunning
                         break
                     beta = min(beta,value) 
         
-        elif n==1: #Leafs  
+        elif depth==1: #Leafs  
             list_boards = []
             for move in poss_moves:
                 t_board = chess.Board(board.fen())
@@ -311,7 +336,10 @@ def AB_prunning(board,n,Evaluator,alpha=-2,beta=2): #alpha-beta prunning
             print(board.fen()) 
     return best_move,value
 
-def ID_AB_prunning(board,n,Evaluator,alpha=-2,beta=2): #alpha-beta prunning        
+def ID_AB_prunning(board,depth,param,Evaluator,alpha=-2,beta=2): #alpha-beta prunning
+    if type(depth)!=int or depth<1:
+        raise TypeError("depth needs to be integer equal or higher than 1 ")
+            
     poss_moves = list(board.legal_moves)
     if len(poss_moves)>0: #Has possible moves -> evals each Node/Leaf 
         
@@ -329,13 +357,13 @@ def ID_AB_prunning(board,n,Evaluator,alpha=-2,beta=2): #alpha-beta prunning
         
         
                                          
-        if n>1: #Branch Nodes
+        if depth>1: #Branch Nodes
             if board.turn: #White
                 value = -5
                 for move in poss_moves:
                     t_board = chess.Board(board.fen())
                     t_board.push(move)
-                    t_value = AB_prunning(t_board,n-1,Evaluator,alpha,beta)[1]
+                    t_value = AB_prunning(t_board,depth-1,Evaluator,alpha,beta)[1]
                     if t_value > value:
                         value = t_value
                         best_move = move
@@ -353,7 +381,7 @@ def ID_AB_prunning(board,n,Evaluator,alpha=-2,beta=2): #alpha-beta prunning
                 for move in poss_moves:
                     t_board = chess.Board(board.fen())
                     t_board.push(move)
-                    t_value = AB_prunning(t_board,n-1,Evaluator,alpha,beta)[1]
+                    t_value = AB_prunning(t_board,depth-1,Evaluator,alpha,beta)[1]
                     if t_value < value:
                         value = t_value
                         best_move = move
@@ -366,7 +394,7 @@ def ID_AB_prunning(board,n,Evaluator,alpha=-2,beta=2): #alpha-beta prunning
                         break
                     beta = min(beta,value) 
                     
-        elif n==1: #Leafs                        
+        elif depth==1: #Leafs                        
             if board.turn: #White
                 value = max(values)
                 moves = [i for i, j in enumerate(values) if j == value]
@@ -376,7 +404,7 @@ def ID_AB_prunning(board,n,Evaluator,alpha=-2,beta=2): #alpha-beta prunning
             best_move = poss_moves[random.choice(moves)]
         
         
-    else:
+    else: #no moves left
         if board.is_game_over():
             if board.is_checkmate():
                 value = 2*(board.turn*(-2)+1)
@@ -391,6 +419,120 @@ def ID_AB_prunning(board,n,Evaluator,alpha=-2,beta=2): #alpha-beta prunning
             print(board.fen()) 
     return best_move,value
 
+def basic_MCTS(board,depth,param,Evaluator,slave=False): #param needs to be adressed later
+    if type(depth)!=int:
+        raise TypeError("depth needs to be integer equal or higher than 1 ")
+    #if param>1 or param<=0:
+    #    raise ValueError("MCTS parameter needs to be belong in ]0,1]")
+    poss_moves = list(board.legal_moves)
+    if len(poss_moves)>0:
+        if slave:
+            n_moves = math.ceil(len(poss_moves)*param)
+            chosen_moves = np.random.choice(poss_moves,n_moves,replace=False)# replace can be changed in a different algorithm
+        else:
+            chosen_moves=poss_moves
+        list_boards = []
+        move_board_list = []
+        best_move = 0 #if it's relevant it will be changed later in the function
+        if depth>1: #Branch nodes
+            
+            for move in chosen_moves:#search every node
+                t_board = chess.Board(board.fen())
+                t_board.push(move)
+                list_boards = list_boards+basic_MCTS(t_board,depth-1,Evaluator,param,True)[1]# get the list of "all" boards
+                if not slave:
+                    move_board_list += [move,]*len(list_boards)#matching boards to moves
+            
+                
+        elif depth==1: #Leafs  
+            list_boards = []
+            for move in chosen_moves:
+                t_board = chess.Board(board.fen())
+                t_board.push(move)
+                list_boards += [t_board,]
+            if not slave:
+                move_board_list += [move,]*len(list_boards)
+                 
+    else: #No move left
+        if board.is_game_over():
+            list_boards = [board]#return itself 
+        else:
+            raise ValueError("board has no moves but is not over:",board.fen())
+                
+    
+    if not slave:
+        values = Evaluator.evaluate(list_boards)
+        if board.turn: #White
+            value = np.max(values)
+            moves = np.where(values == value)[0]
+        else: #black
+            value = np.min(values)
+            moves = np.where(values == value)[0]
+        best_move = move_board_list[random.choice(moves)]
+    
+    return best_move,list_boards
+            
+def weighted_MCTS(board,depth,param,Evaluator,slave=False): #param needs to be adressed later
+    if type(depth)!=int:
+        raise TypeError("depth needs to be integer equal or higher than 1 ")
+    #if param>1 or param<=0:
+    #    raise ValueError("MCTS parameter needs to be belong in ]0,1]")
+    poss_moves = list(board.legal_moves)
+    
+    
+    
+    if len(poss_moves)>0:
+        if slave:
+            d = {chess.PAWN:1,chess.KNIGHT:3,chess.BISHOP:3,chess.ROOK:5,chess.QUEEN:9,chess.KING:0.1}
+            weights = []
+            for move in board.legal_moves:
+                weights += [d[board.piece_type_at(move.from_square)],]
+            weights = np.array(weights)/sum(weights)
+            
+            n_moves = math.ceil(len(poss_moves)*param)
+            chosen_moves = np.random.choice(poss_moves,n_moves,replace=False,p=weights)# replace can be changed in a different algorithm
+        else:
+            chosen_moves=poss_moves
+        list_boards = []
+        move_board_list = []
+        best_move = 0 #if it's relevant it will be changed later in the function
+        if depth>1: #Branch nodes
+            
+            for move in chosen_moves:#search every node
+                t_board = chess.Board(board.fen())
+                t_board.push(move)
+                list_boards = list_boards+weighted_MCTS(t_board,depth-1,param,Evaluator,True)[1]# get the list of "all" boards
+                if not slave:
+                    move_board_list += [move,]*len(list_boards)#matching boards to moves
+            
+                
+        elif depth==1: #Leafs  
+            list_boards = []
+            for move in chosen_moves:
+                t_board = chess.Board(board.fen())
+                t_board.push(move)
+                list_boards += [t_board,]
+            if not slave:
+                move_board_list += [move,]*len(list_boards)
+                 
+    else: #No move left
+        if board.is_game_over():
+            list_boards = [board]#return itself 
+        else:
+            raise ValueError("board has no moves but is not over:",board.fen())
+                
+    
+    if not slave:
+        values = Evaluator.evaluate(list_boards)
+        if board.turn: #White
+            value = np.max(values)
+            moves = np.where(values == value)[0]
+        else: #black
+            value = np.min(values)
+            moves = np.where(values == value)[0]
+        best_move = move_board_list[random.choice(moves)]
+    
+    return best_move,list_boards
 
 #endregion
 
@@ -401,17 +543,51 @@ def ID_AB_prunning(board,n,Evaluator,alpha=-2,beta=2): #alpha-beta prunning
 #region Evaluation
 
 class Evaluator:
-    def __init__(self,traits,model):
-        self.traits = traits
-        self.model = model
+    def __init__(self,name,descr,traits,model):
+        self._traits = traits
+        self._model = model
         
     def evaluate(self,board):
         raise NotImplementedError("Subclasses implement this method")
     
+    def traits(self):
+        for trait in self._traits:
+            print(trait.name)
+    
     def fit(self,library):
         #it's meant to do nothing to avoid raising unecessary errors
         pass
+
+
+class EvaluatorDirector:
+    @staticmethod
+    def random():
+        descr = None
+        return ManualEvaluator("Random",descr,None,calc_zero)
     
+    @staticmethod
+    def sum(traits):
+        descr = None
+        return ManualEvaluator("Sum",descr,traits,calc_sum)
+    
+    @staticmethod
+    def div(traits):
+        descr = None
+        return ManualEvaluator("Divison",descr,traits,calc_div)
+    
+    @staticmethod
+    def sq_dif(traits):
+        descr = None
+        return ManualEvaluator("Square difference",descr,traits,calc_sq_dif)
+    
+    
+    @staticmethod
+    def sqrt_dif(traits):
+        descr = None
+        return ManualEvaluator("Square root difference",descr,traits,calc_sqrt_dif)
+    
+    
+            
     
 #region ManualEvaluation
 
@@ -435,7 +611,7 @@ class ManualEvaluator(Evaluator):
 def hyptan(z,w):
     return((np.exp(z/w)-np.exp(-z/w))/(np.exp(z/w)+np.exp(-z/w)))
 
-def calc_zero(board):
+def calc_zero(white,black):
     return 0
 
 def calc_sum(white,black):#most basic version but sees a sacrifice the same with or without a point difference
@@ -461,13 +637,18 @@ def calc_sqrt_dif(white,black):
 class NNEvaluator(Evaluator):
     def evaluate(self, list_boards):
         values = []
+        n_boards = 0
+        for trait in self._traits:
+            n_boards += trait.n_bitboards
         for board in list_boards:
-            bitboards = np.zeros((1,8,8))
-            for n,trait in enumerate(self.traits):
-                bitboards = np.append(bitboards,trait.getValues(board),axis=0)
+            bitboards = np.zeros((n_boards,8,8))
+            counter = 0
+            for n,trait in enumerate(self._traits):
+                bitboards[counter:counter+trait.n_bitboards] = trait.getValues(board)
+                counter += trait.n_bitboards+1
             values += [bitboards,]
         values = np.array(values)       
-        results = self.model.predict(values,verbose = 0)
+        results = self._model.predict(values,verbose = 0)
         return results
             
     
@@ -492,6 +673,10 @@ class Model(tf.keras.models.Sequential):
             raise ValueError("Model name has not been set. Use setName() method to set the model name.")
 
 
+
+
+
+
 #endregion
 
 
@@ -512,7 +697,7 @@ class Model(tf.keras.models.Sequential):
 #region Trait
 class Trait:
     #Missing description method/attribute
-    def __init__(self,name,funct):
+    def __init__(self,name,descr,funct):
         self.name = name
         self.funct = funct
     
@@ -520,9 +705,35 @@ class Trait:
         raise NotImplementedError("This is meant ot be implemented by the subclasses")
 
 
+
+        
+class TraitDirector:
+     
+    #manual functions   
+    @staticmethod 
+    def PieceValue(param):
+        descr = None
+        return ManualTrait("Piece Value"+str(param),descr,piece_value_funct,param)
+    
+    @staticmethod
+    def PawnAdvancement(param):
+        descr = None
+        return ManualTrait("Pawn Advancement"+str(param),descr,pawn_advancement_funct,param)
+    
+    #nn functions
+    @staticmethod
+    def PositionBitboard():
+        descr = None
+        return NNTrait("Position Bitboard",descr,position_bitboard_funct,12)
+    
 #region ManualTrait
 
-class ManualTrait(Trait):        
+class ManualTrait(Trait):
+    def __init__(self,name,descr,function,param):
+        super().__init__(name,descr,function)
+        self.param = param
+    
+            
     def set_param(self,param):
         self.param = param
         
@@ -546,7 +757,6 @@ def piece_value_funct(board,set):
     
     return white,black
 
-piece_value = ManualTrait("Piece value", piece_value_funct)
 
 
 def pawn_advancement_funct(board,weight): #linear function that takes pawn advancement and return it's value
@@ -560,7 +770,6 @@ def pawn_advancement_funct(board,weight): #linear function that takes pawn advan
     
     return white, black  
  
-pawn_advancement = ManualTrait("Pawn advancement",pawn_advancement_funct) 
 
       
 
@@ -574,6 +783,10 @@ pawn_advancement = ManualTrait("Pawn advancement",pawn_advancement_funct)
 #region NNTrait
 
 class NNTrait(Trait):
+    def __init__(self,name,descr,funct,n_bitboards):
+        super().__init__(name,descr,funct)
+        self.n_bitboards = n_bitboards
+    
     def getValues(self, board):
         return self.funct(board)
     
@@ -591,7 +804,7 @@ def position_bitboard_funct(board): #pnbrqkPNBRQK #bW
         
     return  np.array([bitboards[piece] for piece in piece_list])
 
-position_bitboard = NNTrait("Positions bitboard",position_bitboard_funct)
+
 #endregion
 #endregion
 
@@ -600,88 +813,10 @@ position_bitboard = NNTrait("Positions bitboard",position_bitboard_funct)
 
 
 #region Lists
-search_functs = [minimax, AB_prunning]
-calc_functs = [calc_zero, calc_sum, calc_div, calc_sq_dif, calc_sqrt_dif]
-manual_traits = [piece_value, pawn_advancement]
-nn_traits = [position_bitboard]
-#endregion
-
-
-
-
-
-#region Builders not actual builders
-
-
-        
-def TraitBuilder():
-    answer = None
-    while answer != "q":
-        print("""Trait Builder options:
-              -Manual Trait (m)
-              -NN Trait(n)
-              -quit(q)""")
-        answer = input("answer: ")
-        if answer == "m":
-            trait = ManualTraitBuilder()
-            answer = "q"
-        elif answer == "n":
-            trait = NNTraitBuilder()
-            answer = "q"
-        elif answer !="q":
-            print("invalid input")
-
-def ManualTraitBuilder():
-    answer = None
-    while answer != "q":
-        print("""Manual Trait Builder:
-              choose a function:""")
-        options = []
-        for n,i in manual_traits:
-            print("-"+i.name+"("+str(n)+")")
-            options += [n,]
-            
-        try:
-            trait_n = int(input("answer: "))
-            if trait_n in options:
-                trait = manual_traits[trait_n]
-                print("Set a parameter value:")
-                while answer != "q":
-                    try:
-                        param = int(input("answer"))
-                        trait.set_param(param)
-                        answer = "q"
-                    except ValueError:
-                        print("Invalid input. Please enter a number")
-            else:
-                print("Option out of bounds")
-        except ValueError:
-            print("Invalid input. Please enter a number")
-            
-    return trait
-
-def NNTraitBuilder():
-    answer = None
-    while answer != "q":
-        print("""Manual Trait Builder:
-              choose a function:""")
-        options = []
-        for n,i in manual_traits:
-            print("-"+i.name+"("+str(n)+")")
-            options += [n,]
-            
-        try:
-            trait_n = int(input("answer: "))
-            if trait_n in options:
-                trait = manual_traits[trait_n]
-                print("Set a parameter value:")
-                answer = "q"
-            else:
-                print("Option out of bounds")
-        except ValueError:
-            print("Invalid input. Please enter a number")
-    return trait
-
+#search_functs = [nn_minimax, AB_prunning]
+#calc_functs = [calc_zero, calc_sum, calc_div, calc_sq_dif, calc_sqrt_dif]
+#manual_traits = [piece_value, pawn_advancement]
+#nn_traits = [position_bitboard]
 #endregion
 
 
@@ -746,8 +881,8 @@ def gamesToLibrary(o_games,minply = 0):
 
 
 #region Traits
-basic_trait = piece_value
-basic_trait.set_param(0)
+#basic_trait = piece_value
+#basic_trait.set_param(0)
 #endregion
 
 
@@ -755,7 +890,7 @@ basic_trait.set_param(0)
 
 
 #region Searcher
-ab_searcher_2 = Searcher(AB_prunning,2)
+#ab_searcher_2 = Searcher(AB_prunning,2)
 #endregion
 
 
@@ -777,15 +912,15 @@ first_model.compile(optimizer='adam',
               metrics=['accuracy'])
 
 
-basic_evaluation = ManualEvaluator([basic_trait],calc_sum)
-nn_eval = NNEvaluator([position_bitboard],first_model)
+#basic_evaluation = ManualEvaluator([basic_trait],calc_sum)
+#nn_eval = NNEvaluator([position_bitboard],first_model)
 #endregion
 
 
 
 
 #region Bots
-basic_bot = BotPlayer(basic_evaluation,ab_searcher_2)
+#basic_bot = BotPlayer(basic_evaluation,ab_searcher_2)
 
 #endregion
 

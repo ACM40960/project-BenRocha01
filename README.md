@@ -7,6 +7,9 @@ Bernardo Rocha 23214074
 decided to only use sequential because going to higher complexity models would 
 lead down a rabbit hoe that doesn't fall into the perview of this module
 
+
+During the project I had to deal with the problem of calculations on the GPU or CPU. There are different approaches for both, but at the start I'll stick with tensorflow and GPU based models.
+
 # How to generate a BotPlayer
 <ol>
 <li>Decide if you want a Manual or NN bot</li>
