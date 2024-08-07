@@ -660,15 +660,10 @@ class NNEvaluator(Evaluator):
 
 #region Model handling
 class Model(tf.keras.models.Sequential):
-    def setName(self,name):
-        self.costum_name = name
-        
-    def getName(self):
-        return self.costum_name
     
     def save(self):
         if hasattr(self, 'name'):
-            super().save("model/"+self.costum_name + ".keras")
+            super().save("model/"+self.name + ".keras")
         else:
             raise ValueError("Model name has not been set. Use setName() method to set the model name.")
 
@@ -899,17 +894,9 @@ def gamesToLibrary(o_games,minply = 0):
 
 #region Evaluation
 
-first_model = Model([
-    tf.keras.layers.Flatten(input_shape=(13,8,8),name="flatten"),
-    tf.keras.layers.Dense(100,activation="relu",name="layer2"),
-    tf.keras.layers.Dense(1,activation="tanh",name="output")
-])
 
-first_model.setName("first_model")
 
-first_model.compile(optimizer='adam',
-              loss="mean_squared_error",
-              metrics=['accuracy'])
+
 
 
 #basic_evaluation = ManualEvaluator([basic_trait],calc_sum)
