@@ -224,7 +224,7 @@ def minimax(board,depth,param,Evaluator,slave=False): #alpha-beta prunning
             for move in poss_moves:
                 t_board = chess.Board(board.fen())
                 t_board.push(move)
-                list_boards = minimax(t_board,depth-1,Evaluator,True)[1]
+                list_boards = minimax(t_board,depth-1,param,Evaluator,True)[1]
                 if not slave:
                     move_board_list += [move,]*len(list_boards)
             if slave:
@@ -274,7 +274,7 @@ def AB_prunning(board,depth,param,Evaluator,alpha=-2,beta=2): #alpha-beta prunni
                 for move in poss_moves:
                     t_board = chess.Board(board.fen())
                     t_board.push(move)
-                    t_value = AB_prunning(t_board,depth-1,Evaluator,alpha,beta)[1]
+                    t_value = AB_prunning(t_board,depth-1,param,Evaluator,alpha,beta)[1]
                     if t_value > value:
                         value = t_value
                         best_move = move
@@ -292,7 +292,7 @@ def AB_prunning(board,depth,param,Evaluator,alpha=-2,beta=2): #alpha-beta prunni
                 for move in poss_moves:
                     t_board = chess.Board(board.fen())
                     t_board.push(move)
-                    t_value = AB_prunning(t_board,depth-1,Evaluator,alpha,beta)[1]
+                    t_value = AB_prunning(t_board,depth-1,param,Evaluator,alpha,beta)[1]
                     if t_value < value:
                         value = t_value
                         best_move = move
@@ -351,7 +351,7 @@ def ID_AB_prunning(board,depth,param,Evaluator,alpha=-2,beta=2): #alpha-beta pru
             list_boards += [t_board,]
             values = Evaluator.evaluate(list_boards)
         
-        sorted_indices = sorted(range(len(values)),key=lambda k: values[k])
+        sorted_indices = sorted(range(len(values)), key=lambda k: values.tolist()[k])
         values = [values[i] for i in sorted_indices]
         poss_moves = [poss_moves[i] for i in sorted_indices]
         
@@ -363,7 +363,7 @@ def ID_AB_prunning(board,depth,param,Evaluator,alpha=-2,beta=2): #alpha-beta pru
                 for move in poss_moves:
                     t_board = chess.Board(board.fen())
                     t_board.push(move)
-                    t_value = AB_prunning(t_board,depth-1,Evaluator,alpha,beta)[1]
+                    t_value = ID_AB_prunning(t_board,depth-1,param,Evaluator,alpha,beta)[1]
                     if t_value > value:
                         value = t_value
                         best_move = move
@@ -381,7 +381,7 @@ def ID_AB_prunning(board,depth,param,Evaluator,alpha=-2,beta=2): #alpha-beta pru
                 for move in poss_moves:
                     t_board = chess.Board(board.fen())
                     t_board.push(move)
-                    t_value = AB_prunning(t_board,depth-1,Evaluator,alpha,beta)[1]
+                    t_value = ID_AB_prunning(t_board,depth-1,Evaluator,alpha,beta)[1]
                     if t_value < value:
                         value = t_value
                         best_move = move
@@ -396,11 +396,11 @@ def ID_AB_prunning(board,depth,param,Evaluator,alpha=-2,beta=2): #alpha-beta pru
                     
         elif depth==1: #Leafs                        
             if board.turn: #White
-                value = max(values)
-                moves = [i for i, j in enumerate(values) if j == value]
+                value = float(np.max(values))
+                moves = np.where(values == value)[0].tolist()
             else: #black
-                value = min(values)
-                moves = [i for i, j in enumerate(values) if j == value]         
+                value = float(np.min(values))
+                moves = np.where(values == value)[0].tolist()
             best_move = poss_moves[random.choice(moves)]
         
         
@@ -439,7 +439,7 @@ def basic_MCTS(board,depth,param,Evaluator,slave=False): #param needs to be adre
             for move in chosen_moves:#search every node
                 t_board = chess.Board(board.fen())
                 t_board.push(move)
-                list_boards = list_boards+basic_MCTS(t_board,depth-1,Evaluator,param,True)[1]# get the list of "all" boards
+                list_boards = list_boards+basic_MCTS(t_board,depth-1,param,Evaluator,True)[1]# get the list of "all" boards
                 if not slave:
                     move_board_list += [move,]*len(list_boards)#matching boards to moves
             
@@ -455,6 +455,7 @@ def basic_MCTS(board,depth,param,Evaluator,slave=False): #param needs to be adre
                  
     else: #No move left
         if board.is_game_over():
+            best_move = 0
             list_boards = [board]#return itself 
         else:
             raise ValueError("board has no moves but is not over:",board.fen())
@@ -517,6 +518,7 @@ def weighted_MCTS(board,depth,param,Evaluator,slave=False): #param needs to be a
                  
     else: #No move left
         if board.is_game_over():
+            best_move = 0
             list_boards = [board]#return itself 
         else:
             raise ValueError("board has no moves but is not over:",board.fen())
@@ -544,6 +546,8 @@ def weighted_MCTS(board,depth,param,Evaluator,slave=False): #param needs to be a
 
 class Evaluator:
     def __init__(self,name,descr,traits,model):
+        self.name = name
+        self.descr = descr
         self._traits = traits
         self._model = model
         
@@ -586,9 +590,26 @@ class EvaluatorDirector:
         descr = None
         return ManualEvaluator("Square root difference",descr,traits,calc_sqrt_dif)
     
-    
+    @staticmethod
+    def NN(name,minply):
+        descr = None
+        traits = [TraitDirector.PositionBitboard()]
+        model = tf.keras.saving.load_model(f"model\{name}_{minply}.keras")
+        return NNEvaluator(f"NN {name}_{minply}",descr,traits,model)
+ 
+ 
+NNnames=["Single256","Single128","Single64","Single32","Pair256","Double128","Single256_Double256_128","Single128_Double128"]
+NNminply = ["0","15","30","45","60"]
+
+def loadModels():
+    NNModels = {}
+    for name in NNnames:
+        for minply in NNminply:
+            NNModels[name+"_"+minply]=EvaluatorDirector.NN(name,minply)
+    return NNModels
             
     
+
 #region ManualEvaluation
 
 class ManualEvaluator(Evaluator):
