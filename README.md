@@ -1,3 +1,32 @@
+# Basic Overview
+A code framework to program chess engines in Python.
+This framework was then used to created Neural Network based evaluation functions
+
+
+
+
+
+
+
+
+# Structure of the framework
+
+The base function of the framework is simulateChessGame. This function takes 2 arguments, both are Players, a costum objects.
+
+The structure of a BotPlayer is the following:
+
+
+During operation the Searcher explores the game tree, using the Evaluator to evaluate and choose from the explored leafs.
+
+There are 2 main types of Evaluators, that have the same structure but operate differently. The Manual Evaluators and the NN Evaluators.
+An Evaluator is composed of a list of Traits and a model. The Traits get information from the board and the model calculates the board value based on that information.
+
+
+
+
+
+
+# Extra
 Just a temporary placeholder
 
 The main code right now is Project_code. The rest are mostly remainders of previous versions and I will discard them later. 

@@ -9,6 +9,8 @@
 #region Imports
 import chess
 import chess.pgn
+import chess.svg
+from IPython.display import SVG, display
 import random
 import copy
 import math
@@ -46,7 +48,7 @@ def main():
         print("\nWelcome to my chess player.\nChoose an option:")
         print("""
               --- Play against the computer (choose p)(in progress)
-              --- Choosing the computer algorithm(choose a)(in progress)
+              --- Create a new bot(choose a)(in progress)
               --- Make the computer play against itself (choose c)(in progress)
               --- list of branching methods (choose b)(in progress)
               --- list of evaluation functions (choose e)(in progress)
@@ -87,7 +89,7 @@ def simulateChessGame(p1,p2):
     while board.outcome() is None:
         if board.ply()%2 == 0: #White plays
             try:
-                move = p1.doMove(board)
+                move = p1.doMove(board=board)
             except UnboundLocalError:
                 raise UnboundLocalError(board.fen())
             
@@ -145,8 +147,23 @@ class Player:
         pass 
     
 class HumanPlayer(Player):
-    def doMove(self):
-        pass
+    def doMove(self,board):
+        display(SVG(chess.svg.board(board,size =400)))
+        poss_moves = list(board.legal_moves)
+        #print(poss_moves)
+        invalid = True
+        while invalid:
+            try:
+                move = chess.Move.from_uci(input("your Move?"))
+                if move in poss_moves:
+                    t_board = chess.Board(board.fen())
+                    t_board.push(move)
+                    display(SVG(chess.svg.board(t_board,size =400)))
+                    return move
+                else:
+                    print("Not a valid Move")
+            except chess.InvalidMoveError:
+                print("Not a Move, try again")
     
 class BotPlayer(Player):
     def __init__(self,name,Evaluator,Searcher):
@@ -216,7 +233,7 @@ class SearcherDirector:
 def minimax(board,depth,param,Evaluator,slave=False): #alpha-beta prunning
     if type(depth)!=int:
         raise TypeError("minimax parameter needs to be integer")
-            
+    best_move=0       
     poss_moves = list(board.legal_moves)
     if len(poss_moves)>0: #Has possible moves -> evals each Node/Leaf                                  
         if depth>1: #Branch Nodes
@@ -381,7 +398,7 @@ def ID_AB_prunning(board,depth,param,Evaluator,alpha=-2,beta=2): #alpha-beta pru
                 for move in poss_moves:
                     t_board = chess.Board(board.fen())
                     t_board.push(move)
-                    t_value = ID_AB_prunning(t_board,depth-1,Evaluator,alpha,beta)[1]
+                    t_value = ID_AB_prunning(t_board,depth-1,param,Evaluator,alpha,beta)[1]
                     if t_value < value:
                         value = t_value
                         best_move = move
@@ -826,24 +843,11 @@ def position_bitboard_funct(board): #pnbrqkPNBRQK #bW
 
 
 
-
-
-#region Lists
-#search_functs = [nn_minimax, AB_prunning]
-#calc_functs = [calc_zero, calc_sum, calc_div, calc_sq_dif, calc_sqrt_dif]
-#manual_traits = [piece_value, pawn_advancement]
-#nn_traits = [position_bitboard]
-#endregion
-
-
-
-
-
 #region Misc functions
 
 def gameover(board):
     state = board.outcome()
-    if state.termination == 1:
+    if state.termination == chess.Termination.CHECKMATE:
         if state.winner:
             return 1
         else:
@@ -888,50 +892,6 @@ def gamesToLibrary(o_games,minply = 0):
 
 
 #region Preset instances
-
-
-
-
-
-
-
-
-#region Traits
-#basic_trait = piece_value
-#basic_trait.set_param(0)
-#endregion
-
-
-
-
-
-#region Searcher
-#ab_searcher_2 = Searcher(AB_prunning,2)
-#endregion
-
-
-
-
-
-#region Evaluation
-
-
-
-
-
-
-#basic_evaluation = ManualEvaluator([basic_trait],calc_sum)
-#nn_eval = NNEvaluator([position_bitboard],first_model)
-#endregion
-
-
-
-
-#region Bots
-#basic_bot = BotPlayer(basic_evaluation,ab_searcher_2)
-
-#endregion
-
 
 
 
