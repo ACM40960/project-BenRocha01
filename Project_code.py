@@ -31,53 +31,7 @@ Bots = []
 #endregion
 
 
-
- 
- 
-#region Main functions 
-    
-def version():
-    print("V 0.2.10")
-    ###Changelog
-    # V 0.1.0   -The whole evaluation system was revamped to be modular
-    # V 0.2.0   -Code was reestructured. There are now classes and subclasses for most things.
-    
-def main():
-    answer = "e"
-    while answer != "q":
-        print("\nWelcome to my chess player.\nChoose an option:")
-        print("""
-              --- Play against the computer (choose p)(in progress)
-              --- Create a new bot(choose a)(in progress)
-              --- Make the computer play against itself (choose c)(in progress)
-              --- list of branching methods (choose b)(in progress)
-              --- list of evaluation functions (choose e)(in progress)
-              --- tornament of all combinations (choose t)(in progress)
-              --- quit (choose q)""")
-        answer = input()
-        
-        if answer == "p":
-            pass
-        
-        elif answer == "a":
-            pass
-        
-        elif answer == "c":
-            pass
-        
-        elif answer == "b":
-            pass
-        
-        elif answer == "e":
-            pass
-        
-        elif answer == "t":
-            pass
-        
-#endregion
-   
-
-
+  
 
 
 #region Playing functions
@@ -97,7 +51,7 @@ def simulateChessGame(p1,p2):
             try:
                 move = p2.doMove(board)
             except UnboundLocalError:
-                raise UnboundLocalError(board.fen())
+                raise UnboundLocalError(board.fen(),)
         board.push(move)
     
     result = gameover(board)
@@ -208,220 +162,199 @@ class SearcherDirector:
         return Searcher("Minimax, depth "+str(depth),descr,minimax,depth,None)
     
     @staticmethod
-    def AB_prunning(depth):
+    def minimax_NN(depth):
         descr = None
-        return Searcher("Alpha-Beta prunning, depth "+str(depth),descr,AB_prunning,depth,None)
+        return Searcher("Minimax, depth "+str(depth),descr,minimax_NN,depth,None)
     
     @staticmethod
-    def ID_AB_prunning(depth):
+    def AB_pruning(depth):
         descr = None
-        return Searcher("Iterative deepening Alpha-Beta prunning, depth "+str(depth),descr,ID_AB_prunning,depth,None)
+        return Searcher("Alpha-Beta prunning, depth "+str(depth),descr,AB_pruning,depth,None)
     
     @staticmethod
-    def MCTS(depth,param):
+    def AB_pruning_NN(depth):
         descr = None
-        return Searcher("Monte Carlo Tree Search, depth "+str(depth)+"  factor "+str(param),descr,basic_MCTS,depth,param)
+        return Searcher("Alpha-Beta prunning, depth "+str(depth),descr,AB_pruning_NN,depth,None)
     
     @staticmethod
-    def weighted_MCTS(depth,param):
+    def ID_AB_pruning(depth):
         descr = None
-        return Searcher("Weighted Monte Carlo Tree Search, depth "+str(depth)+"  factor "+str(param),descr,weighted_MCTS,depth,param)
+        return Searcher("Iterative deepening Alpha-Beta prunning, depth "+str(depth),descr,ID_AB_pruning,depth,None)
+    
 
 
 
 
-def minimax(board,depth,param,Evaluator,slave=False): #alpha-beta prunning
+def minimax(board,depth,param,Evaluator):
     if type(depth)!=int:
         raise TypeError("minimax parameter needs to be integer")
     best_move=0       
     poss_moves = list(board.legal_moves)
+    first_move = True
     if len(poss_moves)>0: #Has possible moves -> evals each Node/Leaf                                  
-        if depth>1: #Branch Nodes
-            move_board_list = [] #matches the moves to a board
-            for move in poss_moves:
-                t_board = chess.Board(board.fen())
-                t_board.push(move)
-                list_boards = minimax(t_board,depth-1,param,Evaluator,True)[1]
-                if not slave:
-                    move_board_list += [move,]*len(list_boards)
-            if slave:
-                best_move=0
-            else:
-                values = Evaluator.evaluate(list_boards)
-                if board.turn: #White
-                    value = np.max(values)
-                    moves = np.where(values == value)[0]
-                else: #black
-                    value = np.min(values)
-                    moves = np.where(values == value)[0]
-                best_move = move_board_list[random.choice(moves)]
-        
-        elif depth==1: #Leafs  
-            list_boards = []
-            for move in poss_moves:
-                t_board = chess.Board(board.fen())
-                t_board.push(move)
-                list_boards += [t_board,]
-            
-            if slave:
-                best_move = 0
-            else:
-                values = Evaluator.evaluate(list_boards)                       
-                if board.turn: #White
-                    value = np.max(values)
-                    moves = np.where(values == value)[0]
-                else: #black
-                    value = np.min(values)
-                    moves = np.where(values == value)[0]
-                best_move = poss_moves[random.choice(moves)]
-    return best_move,list_boards
-        
-def AB_prunning(board,depth,param,Evaluator,alpha=-2,beta=2): #alpha-beta prunning   
-    
-    if type(depth)!=int:
-        raise TypeError("AB_prunning parameter needs to be integer")
-         
-    poss_moves = list(board.legal_moves)
-    evals = []
-    
-    if len(poss_moves)>0: #Has possible moves -> evals each Node/Leaf                                  
-        if depth>1: #Branch Nodes
-            if board.turn: #White
-                value = -5
-                for move in poss_moves:
-                    t_board = chess.Board(board.fen())
-                    t_board.push(move)
-                    t_value = AB_prunning(t_board,depth-1,param,Evaluator,alpha,beta)[1]
-                    if t_value > value:
-                        value = t_value
-                        best_move = move
-                    elif t_value == value:
-                        r = random.random()
-                        if r > 0.1:
-                            value = t_value
-                            best_move = move
-                    if value > beta:
-                        break
-                    alpha = max(alpha,value)        
-                         
-            else: #Black
-                value = 5
-                for move in poss_moves:
-                    t_board = chess.Board(board.fen())
-                    t_board.push(move)
-                    t_value = AB_prunning(t_board,depth-1,param,Evaluator,alpha,beta)[1]
-                    if t_value < value:
-                        value = t_value
-                        best_move = move
-                    elif t_value == value: #better move
-                        r = random.random()
-                        if r > 0.1:
-                            value = t_value
-                            best_move = move
-                    if value < alpha: #equally good move
-                        break
-                    beta = min(beta,value) 
-        
-        elif depth==1: #Leafs  
-            list_boards = []
-            for move in poss_moves:
-                t_board = chess.Board(board.fen())
-                t_board.push(move)
-                list_boards += [t_board,]
-            values = Evaluator.evaluate(list_boards)                       
-            if board.turn: #White
-                value = np.max(values)
-                moves = np.where(values == value)[0]
-            else: #black
-                value = np.min(values)
-                moves = np.where(values == value)[0]
-                
-            #print(moves)
-            best_move = poss_moves[random.choice(moves)]
-    else:
-        if board.is_game_over():
-            if board.is_checkmate():
-                value = 2*(board.turn*(-2)+1)
-                best_move = "checkmate?"
-            elif board.is_insufficient_material():
-                value = 0
-                best_move = "insf material?"
-            elif board.is_stalemate():
-                value = 0
-                best_move = "stalemate?"
-        else:
-            print(board.fen()) 
-    return best_move,value
-
-def ID_AB_prunning(board,depth,param,Evaluator,alpha=-2,beta=2): #alpha-beta prunning
-    if type(depth)!=int or depth<1:
-        raise TypeError("depth needs to be integer equal or higher than 1 ")
-            
-    poss_moves = list(board.legal_moves)
-    if len(poss_moves)>0: #Has possible moves -> evals each Node/Leaf 
-        
-        list_boards = []
-        
         for move in poss_moves:
             t_board = chess.Board(board.fen())
             t_board.push(move)
-            list_boards += [t_board,]
-            values = Evaluator.evaluate(list_boards)
+            if depth > 1:
+                value = minimax(t_board,depth-1,param,Evaluator)
+            elif depth == 1:
+                value = Evaluator.evaluate([t_board])
+            if board.turn: #White turn
+                if first_move:
+                    best_value = value
+                    best_move = move
+                if value > best_value:
+                    best_value = value
+                    best_move = move
+            else: #Black turn
+                if first_move:
+                    best_value = value
+                    best_move = move
+                if value < best_value:
+                    best_value = value
+                    best_move = move
         
-        sorted_indices = sorted(range(len(values)), key=lambda k: values.tolist()[k])
-        values = [values[i] for i in sorted_indices]
-        poss_moves = [poss_moves[i] for i in sorted_indices]
-        
-        
-                                         
-        if depth>1: #Branch Nodes
-            if board.turn: #White
-                value = -5
-                for move in poss_moves:
-                    t_board = chess.Board(board.fen())
-                    t_board.push(move)
-                    t_value = ID_AB_prunning(t_board,depth-1,param,Evaluator,alpha,beta)[1]
-                    if t_value > value:
-                        value = t_value
-                        best_move = move
-                    elif t_value == value:
-                        r = random.random()
-                        if r > 0.1:
-                            value = t_value
-                            best_move = move
-                    if value > beta:
-                        break
-                    alpha = max(alpha,value)        
+    else: #No more moves
+        if board.is_game_over():
+            if board.is_checkmate():
+                value = 2*(board.turn*(-2)+1)
+                best_move = "checkmate?"
+            elif board.is_insufficient_material():
+                value = 0
+                best_move = "insf material?"
+            elif board.is_stalemate():
+                value = 0
+                best_move = "stalemate?"
+        else:
+            print(board.fen()) 
+    return best_move,best_value
+
+def minimax_NN(board,depth,param,Evaluator,master = True):
+    if type(depth)!=int:
+        raise TypeError("minimax parameter needs to be integer")
+    best_move=0       
+    poss_moves = list(board.legal_moves)
+    list_boards = []
+    if len(poss_moves)>0: #Has possible moves -> evals each Node/Leaf                                  
+        for move in poss_moves:
+            t_board = chess.Board(board.fen())
+            t_board.push(move)
+            if depth > 1:
+                list_boards += [minimax_NN(t_board,depth-1,param,Evaluator,False)[1],]
+            else:
+                list_boards += [t_board,]
+        if master:
+            def flatten(nested_list,layer=0):
+                flat_list = []
+    
+                for n,item in enumerate(nested_list):
+                    if type(item) == list:
+                        item = flatten(item,layer+1)
+                        flat_list.extend(item)
+                    else:
+                        flat_list.append(item)
+                return flat_list
+            
+            def renest(nested):
+                nonlocal n
+                n_list = []
+                for item in nested:
+                    if type(item) == list:
+                        n_list += [renest(item),]
+                    else:
+                        n_list += [float(values[n]),]
+                        n +=1
+                return n_list 
+            
+            def minimax_nested(nested,turn):
+                values = []
+                if type(nested) is list:
+                    if len(nested) == 0:
+                        return None
+                    for i in nested:
+                        if type(i) is list:
+                            add = minimax_nested(i, not turn)
+                        else:
+                             add = float(i)
+                        if add != None:
+                            values += [add,]
+                else:
+                    values = nested
+                #print("new line")
+                #print(values)
+                if turn:
+                    return max(values)
+                else:
+                    return min(values)
                          
-            else: #Black
-                value = 5
-                for move in poss_moves:
-                    t_board = chess.Board(board.fen())
-                    t_board.push(move)
-                    t_value = ID_AB_prunning(t_board,depth-1,param,Evaluator,alpha,beta)[1]
-                    if t_value < value:
-                        value = t_value
-                        best_move = move
-                    elif t_value == value: #better move
-                        r = random.random()
-                        if r > 0.1:
-                            value = t_value
-                            best_move = move
-                    if value < alpha: #equally good move
-                        break
-                    beta = min(beta,value) 
-                    
-        elif depth==1: #Leafs                        
-            if board.turn: #White
-                value = float(np.max(values))
-                moves = np.where(values == value)[0].tolist()
-            else: #black
-                value = float(np.min(values))
-                moves = np.where(values == value)[0].tolist()
-            best_move = poss_moves[random.choice(moves)]
+            flat_list = flatten(list_boards)
+            boards = flat_list
+            values = Evaluator.evaluate(boards)
+            n = 0
+            nested = renest(list_boards)
+            
+            if board.turn:
+                best_value = -math.inf
+            else:
+                best_value = math.inf
+            
+            for n,i in enumerate(nested):
+                value = minimax_nested(i,not board.turn)
+                if board.turn:
+                    if value > best_value:
+                       value = best_value
+                       best_move = poss_moves[n]
+                else:
+                    if value < best_value:
+                       value = best_value
+                       best_move = poss_moves[n]            
         
+    else: #No more moves
+        if board.is_game_over():
+            if board.is_checkmate():
+                value = 2*(board.turn*(-2)+1)
+                best_move = "checkmate?"
+            elif board.is_insufficient_material():
+                value = 0
+                best_move = "insf material?"
+            elif board.is_stalemate():
+                value = 0
+                best_move = "stalemate?"
+        else:
+            print(board.fen()) 
+    return best_move,list_boards
         
-    else: #no moves left
+def AB_pruning(board,depth,param,Evaluator,alpha=-math.inf,beta=math.inf): #alpha-beta prunning   
+    
+    if type(depth)!=int:
+        raise TypeError("AB_prunning parameter needs to be integer")
+    best_move = 0     
+    poss_moves = list(board.legal_moves)
+    
+    if len(poss_moves)>0: #Has possible moves -> evals each Node/Leaf                                  
+    
+        for move in poss_moves:
+            t_board = chess.Board(board.fen())
+            t_board.push(move)
+            if depth>1: #Branch Nodes
+                value = AB_pruning(t_board,depth-1,param,Evaluator,alpha,beta)[1]
+            elif depth == 1 : #Leaf Nodes
+                board_list = [t_board]
+                value = Evaluator.evaluate(board_list)[0]
+            if board.turn: #White turn
+                if value > alpha:
+                    alpha = value
+                    best_move = move
+                if value > beta:
+                    break
+            else: #Black turn
+                if value < beta:
+                    beta = value
+                    best_move = move
+                if value < alpha:
+                    break
+
+    else: #No more moves
         if board.is_game_over():
             if board.is_checkmate():
                 value = 2*(board.turn*(-2)+1)
@@ -436,122 +369,124 @@ def ID_AB_prunning(board,depth,param,Evaluator,alpha=-2,beta=2): #alpha-beta pru
             print(board.fen()) 
     return best_move,value
 
-def basic_MCTS(board,depth,param,Evaluator,slave=False): #param needs to be adressed later
+def AB_pruning_NN(board,depth,param,Evaluator,alpha=-math.inf,beta=math.inf): #alpha-beta prunning   
     if type(depth)!=int:
-        raise TypeError("depth needs to be integer equal or higher than 1 ")
-    #if param>1 or param<=0:
-    #    raise ValueError("MCTS parameter needs to be belong in ]0,1]")
-    poss_moves = list(board.legal_moves)
-    if len(poss_moves)>0:
-        if slave:
-            n_moves = math.ceil(len(poss_moves)*param)
-            chosen_moves = np.random.choice(poss_moves,n_moves,replace=False)# replace can be changed in a different algorithm
-        else:
-            chosen_moves=poss_moves
-        list_boards = []
-        move_board_list = []
-        best_move = 0 #if it's relevant it will be changed later in the function
-        if depth>1: #Branch nodes
-            
-            for move in chosen_moves:#search every node
-                t_board = chess.Board(board.fen())
-                t_board.push(move)
-                list_boards = list_boards+basic_MCTS(t_board,depth-1,param,Evaluator,True)[1]# get the list of "all" boards
-                if not slave:
-                    move_board_list += [move,]*len(list_boards)#matching boards to moves
-            
-                
-        elif depth==1: #Leafs  
-            list_boards = []
-            for move in chosen_moves:
-                t_board = chess.Board(board.fen())
-                t_board.push(move)
-                list_boards += [t_board,]
-            if not slave:
-                move_board_list += [move,]*len(list_boards)
-                 
-    else: #No move left
-        if board.is_game_over():
-            best_move = 0
-            list_boards = [board]#return itself 
-        else:
-            raise ValueError("board has no moves but is not over:",board.fen())
-                
-    
-    if not slave:
-        values = Evaluator.evaluate(list_boards)
-        if board.turn: #White
-            value = np.max(values)
-            moves = np.where(values == value)[0]
-        else: #black
-            value = np.min(values)
-            moves = np.where(values == value)[0]
-        best_move = move_board_list[random.choice(moves)]
-    
-    return best_move,list_boards
-            
-def weighted_MCTS(board,depth,param,Evaluator,slave=False): #param needs to be adressed later
-    if type(depth)!=int:
-        raise TypeError("depth needs to be integer equal or higher than 1 ")
-    #if param>1 or param<=0:
-    #    raise ValueError("MCTS parameter needs to be belong in ]0,1]")
+        raise TypeError("AB_prunning parameter needs to be integer")
+    best_move = 0     
     poss_moves = list(board.legal_moves)
     
-    
-    
-    if len(poss_moves)>0:
-        if slave:
-            d = {chess.PAWN:1,chess.KNIGHT:3,chess.BISHOP:3,chess.ROOK:5,chess.QUEEN:9,chess.KING:0.1}
-            weights = []
-            for move in board.legal_moves:
-                weights += [d[board.piece_type_at(move.from_square)],]
-            weights = np.array(weights)/sum(weights)
-            
-            n_moves = math.ceil(len(poss_moves)*param)
-            chosen_moves = np.random.choice(poss_moves,n_moves,replace=False,p=weights)# replace can be changed in a different algorithm
-        else:
-            chosen_moves=poss_moves
-        list_boards = []
-        move_board_list = []
-        best_move = 0 #if it's relevant it will be changed later in the function
-        if depth>1: #Branch nodes
-            
-            for move in chosen_moves:#search every node
+    if len(poss_moves)>0: #Has possible moves -> evals each Node/Leaf                                  
+        
+        if depth>1: #Branch Nodes
+            for move in poss_moves:
                 t_board = chess.Board(board.fen())
                 t_board.push(move)
-                list_boards = list_boards+weighted_MCTS(t_board,depth-1,param,Evaluator,True)[1]# get the list of "all" boards
-                if not slave:
-                    move_board_list += [move,]*len(list_boards)#matching boards to moves
-            
+                value = AB_pruning_NN(t_board,depth-1,param,Evaluator,alpha,beta)[1]
+                if board.turn: #White turn
+                    if value > alpha:
+                        alpha = value
+                        best_move = move
+                    if value > beta:
+                        break
+                else: #Black turn
+                    value = value
+                    if value < beta:
+                        beta = value
+                        best_move = move
+                    if value < alpha:
+                        break
                 
-        elif depth==1: #Leafs  
-            list_boards = []
-            for move in chosen_moves:
+        elif depth == 1: #Leaf Nodes
+            board_list = []
+            for move in poss_moves:
                 t_board = chess.Board(board.fen())
                 t_board.push(move)
-                list_boards += [t_board,]
-            if not slave:
-                move_board_list += [move,]*len(list_boards)
-                 
-    else: #No move left
+                board_list+=[t_board,]
+            value = Evaluator.evaluate(board_list)
+            if board.turn: #White turn
+                value = np.max(value)
+            else: #Black turn
+                value = np.min(value)
+            
+
+    else: #No more moves
         if board.is_game_over():
-            best_move = 0
-            list_boards = [board]#return itself 
+            if board.is_checkmate():
+                value = 2*(board.turn*(-2)+1)
+                best_move = "checkmate?"
+            elif board.is_insufficient_material():
+                value = 0
+                best_move = "insf material?"
+            elif board.is_stalemate():
+                value = 0
+                best_move = "stalemate?"
         else:
-            raise ValueError("board has no moves but is not over:",board.fen())
+            print(board.fen()) 
+    return best_move,value
+
+def ID_AB_pruning(board,depth,param,Evaluator,alpha=-math.inf,beta=math.inf): #alpha-beta prunning   
+    if type(depth)!=int:
+        raise TypeError("AB_prunning parameter needs to be integer")
+    best_move = 0     
+    poss_moves = list(board.legal_moves)
+    
+    if len(poss_moves)>0: #Has possible moves -> evals each Node/Leaf                                  
+        board_list = []
+        #getting the boards
+        for move in poss_moves:
+            t_board = chess.Board(board.fen())
+            t_board.push(move)
+            board_list +=[t_board]
+            
+        values = Evaluator.evaluate(board_list)   
+        
+        #sorting the boards
+        t_combined = list(zip(values,board_list,poss_moves))
+        combined = sorted(t_combined,key=lambda x:x[0])
+        sorted_boards = [m for _,m,_ in combined]
+        sorted_moves = [m for _, _,m in combined]
+        if depth>1: #Branch Nodes
+            for board in sorted_boards:
+                value = AB_pruning(board,depth-1,param,Evaluator,alpha,beta)[1]
+                if board.turn: #White turn
+                    if value > alpha:
+                        alpha = value
+                        best_move = sorted_moves[-1]
+                    if value > beta:
+                        break
+                    else: #Black turn
+                        value = min(values)
+                        if value < beta:
+                            beta = value
+                            best_move = sorted_moves[0]
+                        if value < alpha:
+                            break   
+                                        
+        elif depth == 1: #Leaf Nodes
+            if board.turn: #White turn
+                value = values[-1]
+                best_move = sorted_moves[-1]
+            else: #Black turn
+                value = values[0]
+                best_move = sorted_moves[0]
                 
-    
-    if not slave:
-        values = Evaluator.evaluate(list_boards)
-        if board.turn: #White
-            value = np.max(values)
-            moves = np.where(values == value)[0]
-        else: #black
-            value = np.min(values)
-            moves = np.where(values == value)[0]
-        best_move = move_board_list[random.choice(moves)]
-    
-    return best_move,list_boards
+
+    else: #No more moves
+        if board.is_game_over():
+            if board.is_checkmate():
+                value = 2*(board.turn*(-2)+1)
+                best_move = "checkmate?"
+            elif board.is_insufficient_material():
+                value = 0
+                best_move = "insf material?"
+            elif board.is_stalemate():
+                value = 0
+                best_move = "stalemate?"
+        else:
+            print(board.fen()) 
+    return best_move,value
+
+
 
 #endregion
 
@@ -562,18 +497,14 @@ def weighted_MCTS(board,depth,param,Evaluator,slave=False): #param needs to be a
 #region Evaluation
 
 class Evaluator:
-    def __init__(self,name,descr,traits,model):
+    def __init__(self,name,descr,features,model):
         self.name = name
         self.descr = descr
-        self._traits = traits
-        self._model = model
+        self.features = features
+        self.model = model
         
     def evaluate(self,board):
         raise NotImplementedError("Subclasses implement this method")
-    
-    def traits(self):
-        for trait in self._traits:
-            print(trait.name)
     
     def fit(self,library):
         #it's meant to do nothing to avoid raising unecessary errors
@@ -587,32 +518,32 @@ class EvaluatorDirector:
         return ManualEvaluator("Random",descr,None,calc_zero)
     
     @staticmethod
-    def sum(traits):
+    def sum(features):
         descr = None
-        return ManualEvaluator("Sum",descr,traits,calc_sum)
+        return ManualEvaluator("Sum",descr,features,calc_sum)
     
     @staticmethod
-    def div(traits):
+    def div(features):
         descr = None
-        return ManualEvaluator("Divison",descr,traits,calc_div)
+        return ManualEvaluator("Divison",descr,features,calc_div)
     
     @staticmethod
-    def sq_dif(traits):
+    def sq_dif(features):
         descr = None
-        return ManualEvaluator("Square difference",descr,traits,calc_sq_dif)
+        return ManualEvaluator("Square difference",descr,features,calc_sq_dif)
     
     
     @staticmethod
-    def sqrt_dif(traits):
+    def sqrt_dif(features):
         descr = None
-        return ManualEvaluator("Square root difference",descr,traits,calc_sqrt_dif)
+        return ManualEvaluator("Square root difference",descr,features,calc_sqrt_dif)
     
     @staticmethod
     def NN(name,minply):
         descr = None
-        traits = [TraitDirector.PositionBitboard()]
+        features = [FeatureDirector.PositionBitboard()]
         model = tf.keras.saving.load_model(f"model\{name}_{minply}.keras")
-        return NNEvaluator(f"NN {name}_{minply}",descr,traits,model)
+        return NNEvaluator(f"NN {name}_{minply}",descr,features,model)
  
  
 NNnames=["Single256","Single128","Single64","Single32","Pair256","Double128","Single256_Double256_128","Single128_Double128"]
@@ -635,11 +566,12 @@ class ManualEvaluator(Evaluator):
         for board in list_boards:
             white = 0
             black = 0
-            for trait in self.traits:
-                change = trait.getValues(board)
+            for feature in self.features:
+                change = feature.getValues(board)
                 white += change[0]
                 black += change[1]
             values += [self.model(white,black),]
+        
         return values
 
 
@@ -676,17 +608,17 @@ class NNEvaluator(Evaluator):
     def evaluate(self, list_boards):
         values = []
         n_boards = 0
-        for trait in self._traits:
-            n_boards += trait.n_bitboards
+        for feature in self.features:
+            n_boards += feature.n_bitboards
         for board in list_boards:
             bitboards = np.zeros((n_boards,8,8))
             counter = 0
-            for n,trait in enumerate(self._traits):
-                bitboards[counter:counter+trait.n_bitboards] = trait.getValues(board)
-                counter += trait.n_bitboards+1
+            for n,feature in enumerate(self.features):
+                bitboards[counter:counter+feature.n_bitboards] = feature.getValues(board)
+                counter += feature.n_bitboards+1
             values += [bitboards,]
         values = np.array(values)       
-        results = self._model.predict(values,verbose = 0)
+        results = self.model.predict(values,verbose = 0)
         return results
             
     
@@ -727,8 +659,8 @@ class Model(tf.keras.models.Sequential):
 
 
 
-#region Trait
-class Trait:
+#region Feature
+class Feature:
     #Missing description method/attribute
     def __init__(self,name,descr,funct):
         self.name = name
@@ -740,28 +672,28 @@ class Trait:
 
 
         
-class TraitDirector:
+class FeatureDirector:
      
     #manual functions   
     @staticmethod 
     def PieceValue(param):
         descr = None
-        return ManualTrait("Piece Value"+str(param),descr,piece_value_funct,param)
+        return ManualFeature("Piece Value"+str(param),descr,piece_value_funct,param)
     
     @staticmethod
     def PawnAdvancement(param):
         descr = None
-        return ManualTrait("Pawn Advancement"+str(param),descr,pawn_advancement_funct,param)
+        return ManualFeature("Pawn Advancement"+str(param),descr,pawn_advancement_funct,param)
     
     #nn functions
     @staticmethod
     def PositionBitboard():
         descr = None
-        return NNTrait("Position Bitboard",descr,position_bitboard_funct,12)
+        return NNFeature("Position Bitboard",descr,position_bitboard_funct,12)
     
-#region ManualTrait
+#region ManualFeature
 
-class ManualTrait(Trait):
+class ManualFeature(Feature):
     def __init__(self,name,descr,function,param):
         super().__init__(name,descr,function)
         self.param = param
@@ -775,8 +707,8 @@ class ManualTrait(Trait):
  
     
 def piece_value_funct(board,set):
-    value_dict =[{chess.PAWN:1,chess.KNIGHT:3,chess.BISHOP:3,chess.ROOK:5,chess.QUEEN:9,chess.KING:100}, # Common knowledge
-                 {chess.PAWN:1,chess.KNIGHT:3,chess.BISHOP:3.5,chess.ROOK:5,chess.QUEEN:10,chess.KING:100}, # Turing
+    value_dict =[{chess.PAWN:1,chess.KNIGHT:3,chess.BISHOP:3,chess.ROOK:5,chess.QUEEN:9,chess.KING:0}, # Common knowledge
+                 {chess.PAWN:1,chess.KNIGHT:3,chess.BISHOP:3.5,chess.ROOK:5,chess.QUEEN:10,chess.KING:0}, # Turing
                  ]
     white =0
     black =0
@@ -794,12 +726,16 @@ def piece_value_funct(board,set):
 
 def pawn_advancement_funct(board,weight): #linear function that takes pawn advancement and return it's value
     #white advancement
-    squares = np.array(board.pieces(chess.PAWN,chess.WHITE))
-    white = weight * sum(squares//8-1)
+    white = 0
+    squares = list(board.pieces(chess.PAWN,chess.WHITE))
+    for i in squares:
+        white = weight * (i//8-1)
     
     #black advancement
-    squares = np.array(board.pieces(chess.PAWN,chess.BLACK))
-    black = weight * sum((64-squares)//8-1)
+    black = 0
+    squares = list(board.pieces(chess.PAWN,chess.BLACK))
+    for i in squares:
+        black = weight * (i//8-1)
     
     return white, black  
  
@@ -813,9 +749,9 @@ def pawn_advancement_funct(board,weight): #linear function that takes pawn advan
 
 
 
-#region NNTrait
+#region NNFeature
 
-class NNTrait(Trait):
+class NNFeature(Feature):
     def __init__(self,name,descr,funct,n_bitboards):
         super().__init__(name,descr,funct)
         self.n_bitboards = n_bitboards
@@ -884,6 +820,22 @@ def gamesToLibrary(o_games,minply = 0):
             
     library = np.array(library).T
     return library
+
+
+def flatten(nested_list, depth):
+    flat_list = []
+    coordinates = []
+    def helper(sublist, current_coords, level):
+        if level == depth - 1:  # If we're at the second-to-last level
+            for i, item in enumerate(sublist):
+                flat_list.append(item)
+                coordinates.append(current_coords + [i])
+        else:
+            for i, item in enumerate(sublist):
+                helper(item, current_coords + [i], level + 1)
+    
+    helper(nested_list, [], 0)
+    return flat_list,coordinates
 
 #endregion
 
