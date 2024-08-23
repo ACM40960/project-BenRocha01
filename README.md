@@ -1,62 +1,65 @@
-# Basic Overview
+# A Chess Engine Framework for Neural Network Evaluation functions
+Made by:
+Bernardo Rocha 23214074
+requires:
+Python 3.8
+TensorFlow 2.13
+Numpy 1.24.3
+chess 1.10
+
+## Basic Overview
 A code framework to program chess engines in Python.
 This framework was then used to created Neural Network based evaluation functions
+It has searching, evaluation and feature functions, that I explain better later
 
-
-
-
-
-
-
-
-# Structure of the framework
-
-The base function of the framework is simulateChessGame. This function takes 2 arguments, both are Players, a costum objects.
-
-The structure of a BotPlayer is the following:
-
-
-During operation the Searcher explores the game tree, using the Evaluator to evaluate and choose from the explored leafs.
-
-There are 2 main types of Evaluators, that have the same structure but operate differently. The Manual Evaluators and the NN Evaluators.
-An Evaluator is composed of a list of Traits and a model. The Traits get information from the board and the model calculates the board value based on that information.
-
-
-
-
-
-
-# Extra
-Just a temporary placeholder
-
-The main code right now is Project_code. The rest are mostly remainders of previous versions and I will discard them later. 
-
-Bernardo Rocha 23214074
-
-decided to only use sequential because going to higher complexity models would 
-lead down a rabbit hoe that doesn't fall into the perview of this module
-
-
-During the project I had to deal with the problem of calculations on the GPU or CPU. There are different approaches for both, but at the start I'll stick with tensorflow and GPU based models.
-
-# How to generate a BotPlayer
+## Table of contents
 <ol>
-<li>Decide if you want a Manual or NN bot</li>
-<li>Get a list of Traits accordingly to your choice</li>
-<li><ul>
-<li>If you chose an NN bot choose a NN model as calc_funct</li>
-<li>If you chose a Manual bot choose a manual calc_funct</li>
-</ul></li>
-<li>Create an Evaluator using the list of Traits and the calc_funct</li>
-<li>Create a Searcher using a searching function and a parameter</li>
-<li>Create a BotPlayer using the Evaluator and the Searcher defined previously</li>
-<li>You are ready use it to play or training</li>
+    
+<li>Instalation</li>
+<li>Usage</li>
+<li>Structure of the code file</li>
+
 </ol>
 
+## Instalation
+To use this project, download the Project_code.py file
+Then call it from a python interface as you would a normal package
+
+## Usage
+To create a chess engine (here called BotPlayer) you need 2 things.
+
+### 1 create a Searcher using SearcherDirector
+SearcherDirector has the written searching functions as functions for the class.
+Currently there are 5 functions: minimax, Minimax_NN, AB_pruning, AB_prunning_NN and ID_AB_pruning
+All of them have a parameter that represents depth.
+
+### 2 create a list of Feature using FeatureDirector (Only for hand-crafted evaluation)
+Before starting this step you need to know if you want a NN evaluation function or a Manual evaluatin function.
+The FeatureDirector has all the functions already prepared, you just need to set a a parameter.
+
+### 3 create an Evaluator using the EvaluatorDirector
+This will take the list of features as argument if you are creating a hand-crafted function
+If creating a NN evaluation function the arguments are the model and the minply
+
+There are 9 models:
+"Single256","Single128","Single64","Single32","Pair256","Double128","Single256_Double256_128","Single128_Double128"
+and 5 possible values for minply
+"0","15","30","45","60"
+
+### 4 Assemble everything under the BotPlayer
+Create an object class BotPlayer that takes 3 arguments, a name (string, not relevant), a Searcher and an Evaluator
+
+### 5 play the simulations
+Use the function simulateChessGame or simulateMultipleGames, using 2 Players of your choice
+(They can be the same, a HumanPlayer works aswell and needs no arguments when being created)
 
 
 
-# Structure of the code file
+
+
+
+
+## Structure of the code file
 
 <ol>
 <li>Imports</li>
